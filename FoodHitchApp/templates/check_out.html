@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% load static %}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout</title>
+  <link rel="shortcut icon" href="{% static 'images/foodhitch-green.png' %}" type="image/x-icon">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+  <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+  <script src="https://www.paypal.com/sdk/js?client-id=AZu6FUzyWch2r3UjD_6M8YoKoTVPjo3eXmli2voMiD_25rb2YEbiMur6QWRFpsTcEsG8ZRvY6qrI6h9N&currency=USD&disable-funding=credit"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAahMs9GBd2ChJopz74dhOjL8a0ZxXo9-k&callback=initializeMap" async defer></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap');
+    * {
+      font-family: 'Poppins', sans-serif;
+    }
+    body {
+      background-color: #eeffd8;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      margin-left: 24%;
+      
+}
+.header .available-points {
+  margin-left: 60%;
+  font-weight: 700;
+  color: #000;
+  font-size: 16px;
+}
+
+    .header a {
+      margin-right: 2%;
+      text-decoration: none;
+      margin-top: 5%;
+      margin-bottom: 5%;
+}
+
+    .header ion-icon {
+      font-size: 24px;
+      color: #000;
+}
+    .header ion-icon:hover {
+      color: #333333a6;
+    }
+    .page-title {
+      font-size: 20px;
+      color: #333;
+}
+
+    .container {
+      background-color: rgb(255, 255, 255);
+      width: 500px;
+      margin: 0 auto;
+      padding: 30px 50px;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+
+    }
+    p {
+      font-weight: 600;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      border: 1px solid #000000;
+      box-sizing: border-box;
+      border-radius: 5px;
+    }
+    button {
+      background-color: #009914;
+      color: white;
+      padding: 12px 20px;
+      margin: 10px 0;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+      border-radius: 10px;
+      transition: background-color 0.3s ease, transform 0.3s ease;
+    }
+    button:hover {
+      background-color: #007e11;
+    }
+    .payment-options {
+      margin-top: 20px;
+    }
+    .payment-option {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .payment-option img {
+      height: 100px;
+      width: 100px;
+    }
+    .payment-option input[type="radio"] {
+      margin-right: 10px;
+    }
+    .paypal-button {
+      border-radius: 5px;
+      height: 50px;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <a href="{% url 'view_cart' %}">
+      <ion-icon name="arrow-back-outline"></ion-icon>
+    </a>
+    <h1 class="page-title">Checkout</h1>
+
+    <span class="available-points">Available Points: {{ customer_points }}</span>
+  </div>
+
+  <div class="container">
+    <p>Complete the details to proceed.</p>
+    <form id="checkout-form" method="POST" action="{% url 'place_order' %}">
+      {% csrf_token %}
+      <label for="customer-name">Customer Name:</label>
+      <input type="text" id="customer-name" name="customer-name" value="{{ customer.CustomerName }}" readonly>
+
+      <label for="phone-number">Phone Number:</label>
+      <input type="number" id="phone-number" name="phone-number" value="{{ customer.Phone }}" readonly>
+
+      <label for="city">City:</label>
+      <input type="text" id="city" name="city" required>
+
+      <label for="state">State/Province:</label>
+      <input type="text" id="state" name="state" required>
+
+      <label for="postal-code">Postal Code:</label>
+      <input type="text" id="postal-code" name="postal-code" required>
+
+      <label for="address">Address:</label>
+      <input type="text" id="address" name="address" required>
+
+      <button type="button" id="get-location">Use My Current Location</button>
+
+      <label for="subtotal">Subtotal:</label>
+      <input type="number" id="subtotal" name="subtotal" value="{{ cart_total }}" readonly>
+
+      <label for="delivery-fee">Delivery Fee:</label>
+      <input type="number" id="delivery-fee" name="delivery-fee" value="{{ delivery_fee }}" readonly>
+
+      <label for="points-used">Use Points:</label>
+      <input type="number" id="points-used" name="points-used" max="{{ customer_points }}" placeholder="Enter points" oninput="updateDeliveryFee()">
+
+      
+      <label for="total-payable-amount">Total Payable Amount:</label>
+      <input type="number" id="total-payable-amount" name="total-payable-amount" value="{{ total_amount }}" readonly>
+
+      <div class="payment-options">
+        <div class="payment-option" style="margin-left: 80px;">
+          <label>
+            <input type="radio" name="payment-option" value="paypal" checked>
+            <img src="{% static 'images/PAYPAL.png' %}" alt="Pay with PayPal">
+          </label>
+        </div>
+        <div class="payment-option" style="margin-left: 300px; margin-top: -118px;">
+          <label>
+            <input type="radio" name="payment-option" value="cod">
+            <img src="{% static 'images/CASH.png' %}" alt="Cash On Delivery">
+          </label>
+        </div>
+      </div>
+      <button type="button" id="confirm-order">Place Order</button>
+      <div id="paypal-button-container" class="hidden">
+        <!-- PayPal button container -->
+      </div>
+    </form>
+  </div>
+
+  {% if request.session.no_riders_available %}
+  <script>
+    Swal.fire({
+      icon: 'error',
+      title: 'No Riders Available',
+      text: 'Sorry, there are no available riders for delivery at the moment. Please try again later.',
+    });
+  </script>
+{% endif %}
+
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <script>
+
+
+    function goBack() {
+      window.history.back(); // Navigate to the previous page
+    }
+    // Geolocation and reverse geocoding logic
+    document.getElementById('get-location').addEventListener('click', function () {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(success, error, { enableHighAccuracy: true });
+
+        function success(position) {
+          var latitude = position.coords.latitude;
+          var longitude = position.coords.longitude;
+
+          // Reverse geocoding (Google Maps API)
+          var apiKey = 'AIzaSyAahMs9GBd2ChJopz74dhOjL8a0ZxXo9-k';  // Replace with your API key
+          var url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`;
+
+          fetch(url)
+            .then(response => response.json())
+            .then(data => {
+              if (data.status === 'OK') {
+                var address = data.results[0].formatted_address;
+                document.getElementById('address').value = address;
+
+                // Calculate and update delivery fee
+                calculateDeliveryFee(latitude, longitude);
+              } else {
+                alert('Unable to retrieve address. Please try again later.');
+              }
+            })
+            .catch(error => console.log('Error with reverse geocoding:', error));
+        }
+
+        function error(err) {
+          switch (err.code) {
+            case err.PERMISSION_DENIED:
+              alert('User denied the request for Geolocation. Please enable location access in your browser.');
+              break;
+            case err.POSITION_UNAVAILABLE:
+              alert('Location information is unavailable. Please check your device settings.');
+              break;
+            case err.TIMEOUT:
+              alert('The request to get user location timed out. Please try again.');
+              break;
+            case err.UNKNOWN_ERROR:
+              alert('An unknown error occurred. Please try again.');
+              break;
+          }
+        }
+      } else {
+        alert('Geolocation is not supported by this browser.');
+      }
+    });
+
+    // Update delivery fee when address is typed
+    document.getElementById('address').addEventListener('input', function() {
+      var address = this.value;
+
+      // Use Geocoding API to get the coordinates for the address
+      if (address.length > 0) {
+        var apiKey = 'AIzaSyAahMs9GBd2ChJopz74dhOjL8a0ZxXo9-k';  // Replace with your API key
+        var url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
+
+        fetch(url)
+          .then(response => response.json())
+          .then(data => {
+            if (data.status === 'OK') {
+              var location = data.results[0].geometry.location;
+              calculateDeliveryFee(location.lat, location.lng);
+            } else {
+              console.error('Unable to find the address');
+            }
+          })
+          .catch(error => console.log('Error with geocoding:', error));
+      }
+    });
+
+    function calculateDeliveryFee(latitude, longitude) {
+      fetch(`/calculate-delivery-fee/?latitude=${latitude}&longitude=${longitude}`)
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('delivery-fee').value = data.delivery_fee;
+          updateTotalAmount(); // Update total after delivery fee changes
+        })
+        .catch(error => console.log('Error calculating delivery fee:', error));
+    }
+
+    function updateTotalAmount() {
+      var subtotal = parseFloat(document.getElementById('subtotal').value);
+      var deliveryFee = parseFloat(document.getElementById('delivery-fee').value);
+      var totalAmount = subtotal + deliveryFee;
+      document.getElementById('total-payable-amount').value = totalAmount.toFixed(2);
+    }
+
+    function updateDeliveryFee() {
+    var deliveryFee = parseFloat(document.getElementById('delivery-fee').value);
+    var pointsUsed = parseFloat(document.getElementById('points-used').value) || 0; // default to 0 kung empty
+
+    // Check kung ang points nga gisulod malapas sa current points sa customer
+    if (pointsUsed > parseFloat("{{ customer_points }}")) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Invalid Points',
+            text: 'The points entered exceed your available points.',
+            confirmButtonText: 'Okay'
+        });
+        document.getElementById('points-used').value = ''; // i-clear ang input kung invalid
+        return; // ayaw padayuna ang calculations kung invalid
+    }
+
+    // I-adjust ang delivery fee kung naay valid points
+    if (pointsUsed > 0) {
+        var adjustedDeliveryFee = Math.max(0, deliveryFee - pointsUsed);
+        document.getElementById('delivery-fee').value = adjustedDeliveryFee.toFixed(2);
+    } else {
+        // Kung wala gibutang nga points, ipakita lang ang original delivery fee
+        document.getElementById('delivery-fee').value = deliveryFee.toFixed(2);
+    }
+
+    updateTotalAmount();
+}
+
+
+
+
+
+    // PayPal integration
+    document.addEventListener('DOMContentLoaded', function () {
+      var total = parseFloat('{{  total_amount }}');  // Get total from backend
+      if (isNaN(total) || total <= 0) {
+          console.error('Invalid total amount for PayPal transaction');
+          return;
+      }
+
+      var paypalButtons = paypal.Buttons({
+          createOrder: function (data, actions) {
+              return actions.order.create({
+                  purchase_units: [{
+                      amount: {
+                          value: total.toFixed(2)  // Ensure total is a valid number
+                      },
+                      shipping: {
+                          name: {
+                              full_name: "{{ customer.CustomerName }}"
+                          },
+                          address: {
+                              address_line_1: "{{ customer.Address }}",
+                              admin_area_2: document.getElementById('city').value,
+                              admin_area_1: document.getElementById('state').value,
+                              postal_code: document.getElementById('postal-code').value,
+                              country_code: "PH"
+                          }
+                      }
+                  }]
+              });
+          },
+          onApprove: function (data, actions) {
+              return actions.order.capture().then(function (details) {
+                  Swal.fire({
+                      title: 'Payment Successful!',
+                      text: 'Thank you for your order!',
+                      icon: 'success',
+                      confirmButtonText: 'OK'
+                  }).then(() => {
+                      document.getElementById('checkout-form').submit();  // Submit the form on success
+                  });
+              });
+          }
+      });
+
+      paypalButtons.render('#paypal-button-container');  // Render PayPal buttons
+    });
+
+    document.getElementById('confirm-order').addEventListener('click', function () {
+        var selectedPaymentOption = document.querySelector('input[name="payment-option"]:checked').value;
+        
+        if (selectedPaymentOption === 'paypal') {
+          document.getElementById('paypal-button-container').classList.remove('hidden');
+        } else if (selectedPaymentOption === 'cod') {
+          // SweetAlert for COD confirmation
+          Swal.fire({
+            title: 'Confirm Cash on Delivery',
+            text: 'Are you sure you want to place your order with Cash on Delivery?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, place order',
+            cancelButtonText: 'No, go back'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              document.getElementById('checkout-form').submit();
+            } else if (result.isDenied || result.isDismissed) {
+              window.location.href = "{% url 'customer_home' %}";
+            }
+          });
+        }
+      });
+       // Initialize the Google Places Autocomplete
+       function initAutocomplete() {
+            var input = document.getElementById('autocomplete');
+
+            // Create autocomplete object linked to the input field
+            var autocomplete = new google.maps.places.Autocomplete(input, {
+                // Restricting autocomplete to address results only
+                types: ['address'], // Suggest only addresses
+                componentRestrictions: { country: 'ph' } // Restrict to the Philippines
+            });
+
+            // Specify what happens when a place is selected
+            autocomplete.addListener('place_changed', function () {
+                var place = autocomplete.getPlace();
+                if (!place.geometry) {
+                    // User did not select a valid place
+                    alert("Please select a valid address from the list.");
+                    return;
+                }
+
+                // If needed, you can extract further details from the selected place
+                console.log('Full Address: ', place.formatted_address);
+            });
+        }
+
+        // Load autocomplete when the page is loaded
+        window.onload = initAutocomplete;
+
+
+  
+  </script>
+</body>
+</html>

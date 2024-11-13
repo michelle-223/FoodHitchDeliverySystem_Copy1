@@ -1,0 +1,156 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Restaurant Details{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <div class="container">
+        <div class="header-section">
+            <h1>Restaurant Details</h1>
+            <a href="javascript:void(0)" class="btn-back" onclick="window.history.back();">
+                <ion-icon name="arrow-back-outline"></ion-icon> Back
+            </a>
+        </div>
+
+        <div class="request-card">
+            <div class="request-image">
+                <img src="{{ restaurant.Image.url }}" alt="Restaurant Image">
+            </div>
+            <div class="request-info">
+                <p><strong>Restaurant Name:</strong> {{ restaurant.RestaurantName  }}</p>
+                <p><strong>Owner Name:</strong> {{ restaurant.OwnerID.FullName }}</p>
+                <p><strong>Address:</strong> {{ restaurant.Address }}</p>
+                <p><strong>Status:</strong> {{ restaurant.get_Status_display }}</p>
+                <p><strong>Business Permit:</strong> <a href="{{ restaurant.BusinessPermitImage.url }}" target="_blank">View Permit</a></p>
+               
+            </div>
+        </div>
+
+        <div class="action-buttons">
+            <form method="post" action="{% url 'manage_business_request' restaurant.RestaurantID %}">
+                {% csrf_token %}
+                <button type="submit" name="action" value="approve" class="btn-approve">Approve</button>
+                <button type="submit" name="action" value="decline" class="btn-decline">Decline</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* General page styling */
+    body {
+        font-family: 'Poppins', sans-serif;
+        background-color: #ffffff;
+        color: #333;
+        margin: 0;
+        padding: 0;
+    }
+
+    .container {
+        max-width: 700px;
+        margin: 40px auto;
+        background-color: #fff;
+        padding: 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .header-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .header-section h1 {
+        font-size: 24px;
+        font-weight: 600;
+    }
+
+    .btn-back {
+        font-size: 16px;
+        color: #007bff;
+        display: flex;
+        align-items: center;
+        text-decoration: none;
+    }
+
+    /* Request Card */
+    .request-card {
+        display: flex;
+        align-items: flex-start;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        background-color: #fafafa;
+    }
+
+    .request-image img {
+        width: 120px;
+        height: 120px;
+        border-radius: 8px;
+        object-fit: cover;
+        margin-right: 20px;
+    }
+
+    .request-info {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .request-info h2 {
+        font-size: 22px;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+
+    .request-info p {
+        margin: 6px 0;
+        font-size: 16px;
+    }
+
+    .permit-image {
+        width: 200px; /* Adjust width as necessary */
+        height: auto; /* Maintain aspect ratio */
+        border-radius: 5px;
+        margin-top: 10px; /* Add margin for better spacing */
+    }
+
+    /* Buttons */
+    .action-buttons {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .action-buttons button {
+        padding: 12px 18px;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+        margin-left: 10px;
+        transition: background-color 0.3s ease;
+    }
+
+    .btn-approve {
+        background-color: #28a745;
+        color: #fff;
+    }
+
+    .btn-approve:hover {
+        background-color: #218838;
+    }
+
+    .btn-decline {
+        background-color: #dc3545;
+        color: #fff;
+    }
+
+    .btn-decline:hover {
+        background-color: #c82333;
+    }
+
+</style>
+{% endblock %}

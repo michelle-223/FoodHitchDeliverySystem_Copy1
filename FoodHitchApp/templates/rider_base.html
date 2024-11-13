@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FoodHitch Rider</title>
+    <link rel="stylesheet" href="{% static 'css/rider_base.css' %}">
+    <link rel="shortcut icon" href="{% static 'images/foodhitch-green.png' %}" type="image/x-icon">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ionicons/5.6.3/css/ionicons.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ionicons@5.5.2/dist/ionicons/ionicons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    <style>
+        
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            padding-left: 10px;
+        }
+
+        .toggle-container label {
+            margin-left: 10px;
+            font-size: 16px;
+            color: #fff;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #cccccc;
+            transition: 0.4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 12px;
+            width: 12px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #082c01;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(18px);
+        }
+        
+
+    </style>
+
+</head>
+
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <a href="{% url 'rider_home' %}">
+                <img src="{% static 'images/nobgwhitelogo.png' %}" alt="FoodHitch Delivery Logo" class="logo">
+            </a>
+        </div>
+
+        <div class="sidebar-menus">
+            <a href="{% url 'rider_home' %}" class="{% if request.path == '/rider_home/' %}active{% endif %}" aria-label="Home">
+                <ion-icon name="home-outline"></ion-icon>Home</a>
+            <a href="{% url 'update_rider_profile' %}" class="{% if request.path == '/profile/update/' %}active{% endif %}" aria-label="Profile">
+                <ion-icon name="person-outline"></ion-icon>Profile</a>
+            <a href="{% url 'rider_transactions' %}" class="{% if request.path == '/rider_transactions/' %}active{% endif %}" aria-label="Transactions">
+                <ion-icon name="card-outline"></ion-icon>Transactions</a>
+            <a href="{% url 'rider_earnings' %}" class="{% if request.path == '/rider/earnings/' %}active{% endif %}" aria-label="Earnings">
+                <ion-icon name="cash-outline"></ion-icon>Earnings</a>
+            <a href="{% url 'rider_delivery_history' %}" class="{% if request.path == '/rider_delivery_history/' %}active{% endif %}" aria-label="Delivery History">
+                <ion-icon name="car-outline" style="font-size: 21px;"></ion-icon>Delivery History</a>
+            <a href="{% url 'rider_archived_deliveries' %}" class="{% if request.path == '/archived-deliveries/' %}active{% endif %}" aria-label="Archive">
+                <ion-icon name="file-tray-full-outline" style="font-size: 21px;"></ion-icon>Archive</a>
+           
+            <!-- Toggle Switch for Availability -->
+<!-- Toggle Switch for Availability -->
+<!-- rider_base.html -->
+<div class="toggle-container">
+    <ion-icon name="checkmark-circle-outline" style="color: #fff; margin-left: 5px; font-size: 21.5px;"></ion-icon> <!-- Ion Icon for Status -->
+    <label for="availability-toggle" style="color: #fff; margin-left: 15px;">Status</label>
+    <label class="toggle-switch">
+        <!-- Check if availability is 'available' and set the checkbox accordingly -->
+<!-- rider_base.html -->
+<input type="checkbox" id="availability-toggle" name="availability" {% if rider.Availability == 'available' %} checked {% endif %}>
+        <span class="slider"></span>
+    </label>
+</div>
+        </div>
+
+
+        <div class="sidebar-logout">
+            <a href="{% url 'logout' %}"><ion-icon name="exit-outline"></ion-icon>Logout</a>
+        </div>
+    </div>
+
+    <header class="header">
+        <div class="search-bar"></div>
+        <div class="icons">
+            <div class="cart-container">
+                <a href="{% url 'rider_notifications' %}" id="notification-bell" class="notification-bell">
+                    <i class="fas fa-bell"></i>
+                    <span id="notification-count" class="notification-count">{{ notification_count }}</span>
+                </a>
+                <a href="{% url 'rider_chat' rider_id=rider.RiderID %}" id="message" class="message">
+                    <i class="fa-solid fa-message"></i>
+                    <span id="notification-count" class="message-count">{{ notification_count }}</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    {% block content %}{% endblock %}
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<!-- Toggle Switch Script -->
+
+<script>
+    document.getElementById('availability-toggle').addEventListener('change', function() {
+        let availabilityStatus = this.checked ? 'available' : 'unavailable'; // Get the new availability status
+        let csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value; // CSRF token
+
+        // AJAX request to update availability status
+        fetch("{% url 'update_availability' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken  // Send CSRF token
+            },
+            body: JSON.stringify({
+                'availability': availabilityStatus // Send the availability status
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const icon = (this.checked) ? 'success' : 'error'; // Show success or error icon
+                Swal.fire({
+                    icon: icon,
+                    title: `You are now ${availabilityStatus}!`,
+                    showConfirmButton: false,
+                    timer: 2500
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Oops...',
+                    text: 'Failed to update availability.'
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Network Error',
+                text: 'Unable to update availability due to a network issue.'
+            });
+        });
+    });
+</script>
+
+
+</body>
+</html>

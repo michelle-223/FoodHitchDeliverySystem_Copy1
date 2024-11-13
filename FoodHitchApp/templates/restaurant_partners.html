@@ -1,0 +1,82 @@
+{% extends 'admin_base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <h2 class="section-title">Business Owners</h2>
+
+    <div class="store-list">
+        {% for owner in owners %}
+        <div class="store-card">
+            <!-- Display the owner's profile picture and name -->
+            <a href="{% url 'owner_restaurants' owner.OwnerID %}">
+                <img src="{{ owner.Picture.url }}" alt="{{ owner.FirstName }} {{ owner.LastName }}" class="owner-image">
+            </a>
+            <h3>{{ owner.FirstName }} {{ owner.LastName }}</h3>
+        </div>
+        {% empty %}
+        <p>No business owners found.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    .container {
+        padding: 120px;
+        margin-left: 15%;
+    }
+
+    .section-title {
+        font-size: 2.5rem;
+        text-align: center;
+        margin-bottom: 40px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #ddd;
+    }
+
+    .store-list {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 40px;
+    }
+
+    .store-card {
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        transition: transform 0.3s ease;
+    }
+
+    .store-card:hover {
+        transform: translateY(-10px);
+    }
+
+    .store-card h3 {
+        font-size: 1.1rem;
+        margin-top: 20px;
+    }
+
+    .owner-image {
+        width: 100%;
+        max-width: 150px;
+        height: auto;
+        border-radius: 50%;
+    }
+
+    @media (max-width: 900px) {
+        .container {
+            margin-left: 0;
+        }
+        .store-list {
+            grid-template-columns: repeat(1, 1fr);
+        }
+    }
+
+    @media (max-width: 600px) {
+        .store-list {
+            grid-template-columns: repeat(1, 1fr);
+        }
+    }
+</style>
+{% endblock %}

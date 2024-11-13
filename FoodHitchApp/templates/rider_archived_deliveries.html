@@ -1,0 +1,122 @@
+{% extends "rider_base.html" %}
+{% load static %}
+
+{% block title %}Archived Deliveries{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-header">
+        <h1 class="page-title">Archived Deliveries</h1>
+        <h4 class="subtitle">List of your past archived deliveries</h4>
+    </div>
+
+    <div class="transaction-container">
+        <div class="archived-delivery-history" id="archived-delivery-history">
+            {% for delivery in archived_deliveries %}
+            <div class="transaction-card" id="archived-delivery-{{ delivery.DeliveryID }}">
+                <div class="transaction-info">
+                    <p><strong>Delivery ID:</strong> {{ delivery.DeliveryID }}</p>
+                    <p><strong>Order ID:</strong> {{ delivery.OrderID }}</p>
+                    <p><strong>Customer Name:</strong> {{ delivery.CustomerID.CustomerName }}</p> 
+                    <p><strong>Address:</strong> {{ delivery.Address }}</p>
+                    <p><strong>Date:</strong> {{ delivery.Date|date:"F j, Y" }}</p> <!-- Added Date here -->
+                    <p><strong>Restaurant Name:</strong> {{ delivery.RestaurantID.RestaurantName }}</p>
+                    <p><strong>Total Payable:</strong> ₱{{ delivery.TotalPayableAmount }}</p>
+                    <p class="status"><strong>Status:</strong> <span class="status-archived">Archived</span></p>
+                </div>
+            </div>
+            {% empty %}
+            <p class="no-archived-deliveries-message">No archived deliveries found.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+<style>
+    /* Import Poppins font */
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+    body {
+        font-family: 'Poppins', sans-serif;
+    }
+
+    .main-content {
+        padding: 20px;
+    }
+
+    .transaction-container {
+        max-width: 1200px;
+        width: 70%;
+        margin: auto;
+        border-radius: 10px;
+        padding: 40px;
+    }
+
+    .archived-delivery-history {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        margin-top: 10%;
+    }
+
+    .transaction-card {
+        background-color: #ffffff;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 10px 10px rgba(0, 0, 0, 0.1);
+        position: relative;
+        transition: transform 0.2s;
+    }
+
+    .transaction-card:hover {
+        transform: scale(1.02);
+    }
+
+    .transaction-info p {
+        margin: 10px 0;
+        color: #555;
+        font-size: 16px;
+    }
+
+    .status {
+        margin-top: 10px;
+    }
+
+    .status-archived {
+        color: #28a745;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-weight: bold;
+    }
+
+    .archive-button {
+        background-color: #17a2b8; /* Teal */
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 15px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: background-color 0.3s, transform 0.3s;
+        position: absolute;
+        right: 20px;
+        bottom: 20px;
+    }
+
+    .archive-button:hover {
+        background-color: #138496; /* Darker teal */
+        transform: translateY(-2px);
+    }
+
+    .no-deliveries-message {
+        text-align: center;
+        font-size: 18px;
+        color: #777;
+    }
+    
+    .custom-confirm-button {
+        background-color: #009914 !important;
+        color: white !important;
+        border: none !important;
+    }
+</style>
+{% endblock %}

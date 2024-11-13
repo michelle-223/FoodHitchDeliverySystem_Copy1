@@ -1,0 +1,157 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap');
+body{
+    margin: 0;
+    padding: 0;
+    font-family: 'Poppins',sans-serif;
+    background-color: #ffffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+        
+.container {
+    position: relative;
+    background-color: #eaffee;
+    margin-left: 605px;
+    padding-bottom: 65px;
+    text-align: center;
+    border-radius: 0px 30px 30px 0px;
+    width: 570px;
+    top: 1px;
+    height: 460px;
+    box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.199), /* Shadow below */
+                5px 0px 15px rgba(148, 148, 148, 0.137);
+
+
+}
+
+.logo {
+    position: absolute;
+    top: 59px;
+    left: 105px;
+
+}
+
+.logo img {
+    width: 600px;
+    height: 525px;
+    border-radius: 30px 0px 0px 30px;
+    box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.199), /* Shadow below */
+            -5px 0px 15px rgba(148, 148, 148, 0.137);
+}
+
+.login-form {
+    padding: 62px;
+    border-radius: 20px;
+    height: 45vh;
+    
+}
+
+.login-form h2 {
+    font-size: 28px;
+    color: BLACK;
+    text-align: left;
+    margin-bottom: 30px;
+    margin-top: -25px;
+    
+    
+}
+
+.error-message {
+    color: red;
+    font-size: 14px;
+    margin-top: 5px;
+    display: block;
+  }
+  .errormess{
+	text-align: center;
+	color: red;
+}
+    
+
+label {
+    display: block;
+    margin-bottom: 7px;
+    color: black;
+    font-size: 1.1rem;
+    margin-right: 70%;
+}
+
+
+input[type="text"],
+input[type="password"] {
+    width: 95%; 
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 2px solid black;
+    border-radius: 5px;
+    font-size: 14px;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: black;
+}
+
+
+button {
+    display: block;
+    margin: 15px 0px; 
+    width: 100%; 
+    background-color: #009914;
+    color: #fff;
+    border: none;
+    padding: 10px; 
+    border-radius: 5px;
+    font-size: 18px; 
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+
+}
+button:hover {
+    background-color: #007e11;
+}
+.forgot-password a {
+    text-decoration: underline;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+    color: rgb(0, 0, 187);
+
+}
+.forgot-password a:hover {
+    color: rgb(63, 63, 255);
+}
+
+.sign-link{
+    font-size: 15px;
+    text-align: center;
+    margin: 25px 0;
+}
+.sign-link p {
+    color: #1a1a1a;
+    margin-right: 28px;
+    margin-left: 20px;
+    font-size: 1rem;
+    
+}
+.horizontal-links {
+    list-style-type: none;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    gap: 2px;
+}
+
+.horizontal-links li {
+    display: inline;
+}
+
+.horizontal-links a {
+    text-decoration: underline;
+    color: #242424;
+    font-weight: bold;
+    padding: 5px 10px;
+    transition: background-color 0.10s ease, transform 0.10s ease;
+}
+
+.horizontal-links a:hover {
+    color: rgb(63, 63, 63);
+}
+
