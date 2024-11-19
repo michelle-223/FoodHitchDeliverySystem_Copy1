@@ -1,9 +1,11 @@
 {% extends "rider_base.html" %}
-{% load static %}
+
 
 {% block title %}Rider Transactions{% endblock %}
 
 {% block content %}
+{% load static %}
+
 <div class="main-content">
     <div class="page-header"> <!-- New container for h1 and h2 -->
         <h1 class="page-title">Order Transactions</h1>
@@ -24,10 +26,32 @@
                     <p><strong>Ordered Items:</strong></p>
                     <ul>
                         {% for item in delivery.delivery_items.all %}
-                        <li style=" list-style-type: none;">{{ item.FoodID.FoodName }} (x{{ item.Quantity }})</li>
-                    {% endfor %}
+                        <li style="list-style-type: none;">{{ item.FoodID.FoodName }} (x{{ item.Quantity }})</li>
+                        {% endfor %}
                     </ul>
-                    
+                
+                    <p><strong>Payment Method:</strong> 
+                        {% if delivery.PaymentMethod == 'gcash' %}
+                            Gcash
+                        {% else %}
+                            Cash on Delivery
+                        {% endif %}
+                    </p>
+                
+                    {% if delivery.PaymentMethod == 'gcash' %}
+                        <p><strong>Payment Status:</strong> 
+                            {% if delivery.PaymentStatus == 'Pending' %}
+                                Pending (Awaiting Admin Approval)
+                            {% elif delivery.PaymentStatus == 'Approved' %}
+                                Approved (Ready for Shipping)
+                            {% elif delivery.PaymentStatus == 'Disapproved' %}
+                                Disapproved (Order Cancelled)
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </p>
+                    {% endif %}
+                
                     <p class="status"><strong>Status:</strong> 
                         <span class="status-indicator" data-delivery-id="{{ delivery.DeliveryID }}" 
                         {% if delivery.DeliveryStatus == 'In Transit' %} class="status-indicator status-in-transit" 
@@ -36,18 +60,11 @@
                         {{ delivery.DeliveryStatus }}
                     </span>
                     </p>
-                </div>
-                <button class="track-button" style="margin-bottom: 30px;" onclick="trackCustomer('{{ delivery.Address }}')">Track Customer Location</button>
-                
-                <form class="status-update-form" data-delivery-id="{{ delivery.DeliveryID }}">
-                    {% csrf_token %}
-                    <button type="button" name="status" value="In Transit" class="status-button in-transit" onclick="updateStatus('{{ delivery.DeliveryID }}', 'On Transit')">Mark as In Transit</button>
-                    <button type="button" name="status" value="Delivered" class="status-button delivered" onclick="updateStatus('{{ delivery.DeliveryID }}', 'Delivered')">Mark as Delivered</button>
-                </form>
+                </div>                
             </div>
             {% endfor %}
         {% else %}
-            <p>No deliveries assigned to you.</p>
+            <p>No deliveries available.</p>
         {% endif %}
     </div>
 </div>

@@ -14,11 +14,13 @@ from django.db.models.functions import ExtractMonth, TruncMonth, TruncDate, Trun
 from django.contrib.auth.hashers import make_password
 from .forms import PasswordResetForm, PasswordSetForm
 import logging
+from django.core.exceptions import ObjectDoesNotExist
 from datetime import datetime, timedelta
 import os
 from django.conf import settings
 from decimal import Decimal
 from django.utils.timezone import now
+from .models import Order, PaymentProof
 from calendar import month_name
 from django.db.models import Sum
 import requests
@@ -612,17 +614,11 @@ def customer_base(request):
 
 @login_required
 def customer_track_order(request):
-    if request.user.is_authenticated:
-        customer = request.user.customer
-        deliveries = Delivery.objects.select_related('RiderID', 'RestaurantID').filter(CustomerID=customer).exclude(DeliveryStatus='Received')
+    # Fetch all delivery information, excluding deliveries with status 'Received'
+    deliveries = Delivery.objects.select_related('RiderID', 'RestaurantID').exclude(DeliveryStatus='Received')
 
-        if not deliveries.exists():
-            messages.info(request, "No deliveries available for tracking.")
-            return redirect('customer_home')  # or any relevant page
-
-        return render(request, 'customer_track_order.html', {'deliveries': deliveries})
-    else:
-        return redirect('customer_login')
+    # Pass the filtered deliveries to the template
+    return render(request, 'customer_track_order.html', {'deliveries': deliveries})
 
 logger = logging.getLogger(__name__)
 
@@ -1414,10 +1410,26 @@ def place_order(request):
             'state': request.POST.get('state'),
             'postal_code': request.POST.get('postal-code'),
             'payment_option': payment_option,
-            'subtotal': float(subtotal),  # Convert Decimal to float
-            'delivery_fee': float(delivery_fee),  # Convert Decimal to float
-            'total_amount': float(total_amount)  # Convert Decimal to float
+            'subtotal': float(subtotal),
+            'delivery_fee': float(delivery_fee),
+            'total_amount': float(total_amount)
         }
+
+        # Attempt to assign a rider with Availability "available" and Status "accepted"
+        available_rider = Rider.objects.filter(Availability="available", Status="accepted").first()
+
+        # Handle payment option logic
+        if payment_option == 'gcash':
+            if not available_rider:
+                request.session['no_riders_available'] = True
+                return redirect('check_out')  # Redirect back to checkout if no rider is available
+            else:
+                return redirect('pay_with_gcash')  # Redirect to the Gcash payment page
+
+        elif payment_option == 'cod':
+            if not available_rider:
+                request.session['no_riders_available'] = True
+                return redirect('check_out')  # Redirect back to checkout if no rider is available
 
         # Create initial order
         order = Order(CustomerID=customer, OrderTotal=0, Date=timezone.now(), TransactionID='')
@@ -1438,27 +1450,9 @@ def place_order(request):
         # Calculate total payable amount
         total_amount = total_order_amount + delivery_fee
 
-        # Handle payment option with PayPal (if applicable)
-        if payment_option == 'paypal':
-            paypal_dict = {
-                'business': settings.PAYPAL_RECEIVER_EMAIL,
-                'amount': total_amount,
-                'item_name': f'Order from {customer.CustomerName}',
-                'invoice': order.OrderID,
-                'notify_url': request.build_absolute_uri('/paypal-ipn/'),
-                'return': request.build_absolute_uri('/order-completed/'),
-                'cancel_return': request.build_absolute_uri('/order-cancelled/'),
-                'address_override': 1,
-                'address': address,
-            }
-            form = PayPalPaymentsForm(initial=paypal_dict)
-            rendered_form = form.render()
-
-        # Attempt to assign a rider with Availability "available" and Status "accepted"
-        available_rider = Rider.objects.filter(Availability="available", Status="accepted").first()
-
+        # Create delivery record if a rider is available
         if available_rider:
-            # Create delivery record
+            # Create the delivery record and associate it with the order
             delivery = Delivery.objects.create(
                 CustomerID=customer,
                 RiderID=available_rider,
@@ -1475,7 +1469,7 @@ def place_order(request):
             for item in cart_items:
                 DeliveryItem.objects.create(Delivery=delivery, FoodID=item.FoodID, Quantity=item.Quantity)
 
-            # Notify rider
+            # Notify rider via email
             rider_email = available_rider.user.email
             subject = 'New Order Notification'
             customer_name = customer.CustomerName
@@ -1495,18 +1489,16 @@ def place_order(request):
                 messages.error(request, "Failed to send email notification.")
                 print(f"Email send error: {e}")
 
-            # Store notification in session
+            # Store rider notifications in session
             request.session['rider_notifications'] = request.session.get('rider_notifications', [])
             request.session['rider_notifications'].append({
                 'message': f"New order from {customer_name} at {restaurant_name}: {order_items}.",
                 'timestamp': timezone.now().strftime('%Y-%m-%d %H:%M:%S')
             })
 
-        else:
-            # No available riders, pass a flag to display the SweetAlert
-            request.session['no_riders_available'] = True
-            return redirect('check_out')
-
+            # Mark rider as unavailable after assignment
+            available_rider.Availability = 'unavailable'
+            available_rider.save()
 
         # Calculate points earned
         points_earned = Decimal(0)
@@ -1531,6 +1523,58 @@ def place_order(request):
         return redirect('customer_home')
 
     return redirect('customer_home')
+
+
+
+def submit_payment_proof(request, order_id):
+    try:
+        order = Order.objects.get(OrderID=order_id)
+    except Order.DoesNotExist:
+        messages.error(request, "Order not found.")
+        return redirect('customer_home')
+
+    if order.PaymentMethod != 'gcash':
+        return redirect('customer_home')
+
+    # Check if a payment proof already exists for this order
+    if order.ProofOfPayment:
+        messages.error(request, "A payment proof for this order has already been submitted.")
+        return redirect('pay_with_gcash', order_id=order.OrderID)
+
+    if request.method == 'POST' and request.FILES.get('payment-proof'):
+        payment_proof_file = request.FILES['payment-proof']
+        
+        # Save the new payment proof to the Order model
+        order.ProofOfPayment = payment_proof_file
+        order.PaymentStatus = 'Pending'  # Set payment status to 'Pending' for admin review
+        order.save()
+
+        # Assign a rider but mark payment status as pending
+        rider = order.get_assigned_rider()
+        if rider:
+            # Logic to assign the rider but with "Pending" status
+            order.DeliveryStatus = 'Pending'
+            order.save()
+
+        messages.success(request, "Payment proof submitted successfully! Our team will verify it shortly.")
+        return redirect('customer_home')  # Or redirect to a confirmation page
+
+    return render(request, 'submit_payment_proof.html', {'order': order})
+
+
+
+@login_required
+def pay_with_gcash(request):
+    # Retrieve the latest order for the logged-in customer
+    customer = request.user.customer
+    order = Order.objects.filter(CustomerID=customer).order_by('-Date').first()
+
+    if not order:
+        messages.error(request, "No active order found.")
+        return redirect('customer_home')
+
+    return render(request, 'pay_with_gcash.html', {'order': order})
+
 
 
 
@@ -2179,3 +2223,4 @@ def delete_conversation(request):
             return JsonResponse({'success': False, 'error': 'Rider not found'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
+

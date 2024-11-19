@@ -64,7 +64,7 @@ from .views import (
     rider_notifications,
     update_store_owner_profile, reorder, update_availability, password_reset_request, password_reset_set,
     check_username, remove_favorite, order_completed, verify_otp, owner_restaurants, archive_delivery, rider_archived_deliveries,
-    customer_chat, send_message, rider_chat, delete_conversation
+    customer_chat, send_message, rider_chat, delete_conversation, pay_with_gcash, submit_payment_proof
 )
 
 urlpatterns = [
@@ -158,6 +158,11 @@ urlpatterns = [
     path('rider/chat/<int:rider_id>/', rider_chat, name='rider_chat'),
     path('send_message/', send_message, name='send_message'),
     path('delete_conversation/', delete_conversation, name='delete_conversation'),
+
+    path('pay_with_gcash/', pay_with_gcash, name='pay_with_gcash'),  # URL for Gcash payment page
+    path('submit-payment-proof/<int:order_id>/', submit_payment_proof, name='submit_payment_proof'),
+
+
 
 ]
 

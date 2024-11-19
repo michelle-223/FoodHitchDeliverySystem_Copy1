@@ -165,8 +165,8 @@
       <div class="payment-options">
         <div class="payment-option" style="margin-left: 80px;">
           <label>
-            <input type="radio" name="payment-option" value="paypal" checked>
-            <img src="{% static 'images/PAYPAL.png' %}" alt="Pay with PayPal">
+            <input type="radio" name="payment-option" value="gcash" checked>
+            <img src="{% static 'images/gcash.png' %}" alt="Pay with Gcash">
           </label>
         </div>
         <div class="payment-option" style="margin-left: 300px; margin-top: -118px;">
@@ -321,61 +321,27 @@
 }
 
 
-
-
-
-    // PayPal integration
-    document.addEventListener('DOMContentLoaded', function () {
-      var total = parseFloat('{{  total_amount }}');  // Get total from backend
-      if (isNaN(total) || total <= 0) {
-          console.error('Invalid total amount for PayPal transaction');
-          return;
-      }
-
-      var paypalButtons = paypal.Buttons({
-          createOrder: function (data, actions) {
-              return actions.order.create({
-                  purchase_units: [{
-                      amount: {
-                          value: total.toFixed(2)  // Ensure total is a valid number
-                      },
-                      shipping: {
-                          name: {
-                              full_name: "{{ customer.CustomerName }}"
-                          },
-                          address: {
-                              address_line_1: "{{ customer.Address }}",
-                              admin_area_2: document.getElementById('city').value,
-                              admin_area_1: document.getElementById('state').value,
-                              postal_code: document.getElementById('postal-code').value,
-                              country_code: "PH"
-                          }
-                      }
-                  }]
-              });
-          },
-          onApprove: function (data, actions) {
-              return actions.order.capture().then(function (details) {
-                  Swal.fire({
-                      title: 'Payment Successful!',
-                      text: 'Thank you for your order!',
-                      icon: 'success',
-                      confirmButtonText: 'OK'
-                  }).then(() => {
-                      document.getElementById('checkout-form').submit();  // Submit the form on success
-                  });
-              });
-          }
-      });
-
-      paypalButtons.render('#paypal-button-container');  // Render PayPal buttons
-    });
-
     document.getElementById('confirm-order').addEventListener('click', function () {
-        var selectedPaymentOption = document.querySelector('input[name="payment-option"]:checked').value;
-        
-        if (selectedPaymentOption === 'paypal') {
-          document.getElementById('paypal-button-container').classList.remove('hidden');
+      var selectedPaymentOption = document.querySelector('input[name="payment-option"]:checked').value;
+    
+    if (selectedPaymentOption === 'gcash') {
+        // SweetAlert for Gcash confirmation
+        Swal.fire({
+            title: 'Confirm Gcash Payment',
+            text: 'You will be redirected to the payment page to complete your order with Gcash. Are you sure you want to proceed?',
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, proceed',
+            cancelButtonText: 'No, go back'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Submit the form to proceed with Gcash payment
+                document.getElementById('checkout-form').submit();
+            } else if (result.isDenied || result.isDismissed) {
+                // Optionally handle cancellation
+                Swal.fire('Order not placed', 'You can continue editing your order.', 'info');
+            }
+        });
         } else if (selectedPaymentOption === 'cod') {
           // SweetAlert for COD confirmation
           Swal.fire({
