@@ -612,11 +612,17 @@ def customer_base(request):
 
 @login_required
 def customer_track_order(request):
-    # Fetch all delivery information, excluding deliveries with status 'Received'
-    deliveries = Delivery.objects.select_related('RiderID', 'RestaurantID').exclude(DeliveryStatus='Received')
+    if request.user.is_authenticated:
+        customer = request.user.customer
+        deliveries = Delivery.objects.select_related('RiderID', 'RestaurantID').filter(CustomerID=customer).exclude(DeliveryStatus='Received')
 
-    # Pass the filtered deliveries to the template
-    return render(request, 'customer_track_order.html', {'deliveries': deliveries})
+        if not deliveries.exists():
+            messages.info(request, "No deliveries available for tracking.")
+            return redirect('customer_home')  # or any relevant page
+
+        return render(request, 'customer_track_order.html', {'deliveries': deliveries})
+    else:
+        return redirect('customer_login')
 
 logger = logging.getLogger(__name__)
 
@@ -2173,4 +2179,3 @@ def delete_conversation(request):
             return JsonResponse({'success': False, 'error': 'Rider not found'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
-
