@@ -20,6 +20,29 @@
                 <p><strong>Total Payable:</strong> ₱{{ delivery.TotalPayableAmount }} </p>
                 <p><strong>Order Date:</strong> {{ delivery.Date|date:"F j, Y, g:i a" }} </p>
             </div>
+
+            <p><strong>Payment Method:</strong> 
+                {% if delivery.PaymentMethod == 'gcash' %}
+                    Gcash
+                {% else %}
+                    Cash on Delivery
+                {% endif %}
+            </p>
+        
+            {% if delivery.PaymentMethod == 'gcash' %}
+                <p><strong>Payment Status:</strong> 
+                    {% if delivery.PaymentStatus == 'Pending' %}
+                        Pending (Awaiting Admin Approval)
+                    {% elif delivery.PaymentStatus == 'Approved' %}
+                        Approved (Ready for Shipping)
+                    {% elif delivery.PaymentStatus == 'Disapproved' %}
+                        Disapproved (Order Cancelled)
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </p>
+            {% endif %}
+            
             <button class="track-button" onclick="trackRider('{{ delivery.RiderID.RiderID }}')">Track Rider Location</button>
 
             <button class="chat-button" onclick="openChat('{{ delivery.RiderID.RiderID }}')">Chat with Rider</button>
