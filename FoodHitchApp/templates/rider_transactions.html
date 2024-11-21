@@ -23,14 +23,20 @@
                     <p><strong>Restaurant Name:</strong> {{ delivery.RestaurantID.RestaurantName }}</p>
                     <p><strong>Total Payable:</strong> ₱{{ delivery.TotalPayableAmount }}</p>
                     
-                    <p><strong>Ordered Items:</strong></p>
-                    <ul>
-                        {% for item in delivery.delivery_items.all %}
-                        <li style=" list-style-type: none;">{{ item.FoodID.FoodName }} (x{{ item.Quantity }})</li>
-                    {% endfor %}
-                    </ul>
+                    <p><strong>Ordered Menu:</strong></p>
+                        {% for delivery_item in delivery.delivery_items.all %}
+                            <li>
+                                {{ delivery_item.FoodID.FoodName }} - x{{ delivery_item.Quantity }} 
+                                (Price: {{ delivery_item.FoodID.Price }})
+                            </li>
+                        {% endfor %}
                     
-                    <p class="status"><strong>Status:</strong> 
+
+                    <p><strong>Payment Method:</strong> {{ delivery.OrderID.PaymentMethod }}</p>
+                    <p><strong>Payment Status:</strong> {{ delivery.OrderID.PaymentStatus }}</p> <!-- Display Payment Status -->
+
+                    
+                    <p class="status"><strong>Delivery Status:</strong> 
                         <span class="status-indicator" data-delivery-id="{{ delivery.DeliveryID }}" 
                         {% if delivery.DeliveryStatus == 'In Transit' %} class="status-indicator status-in-transit" 
                         {% elif delivery.DeliveryStatus == 'Delivered' %} class="status-indicator status-delivered" 

@@ -3,6 +3,8 @@
 {% block title %}My Cart{% endblock %}
 
 {% block content %}
+{% load static %}
+
 <div class="main-content">
     <div class="cart-container">
         <h1 class="cart-title">My Cart</h1>
@@ -48,6 +50,7 @@
         </div>
     </div>
 </div>
+<div id="no-available-riders" data-no-available-riders="{{ no_available_riders|yesno:'true,false' }}"></div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -86,7 +89,23 @@
                 return;
             }
 
-            // Confirm checkout if items are from the same restaurant
+            // Check if there are no available riders
+            const noAvailableRidersElement = document.getElementById('no-available-riders');
+            const noAvailableRiders = noAvailableRidersElement && noAvailableRidersElement.dataset.noAvailableRiders === 'true';
+
+            if (noAvailableRiders) {
+                // If no available riders, show SweetAlert with warning and redirect to homepage
+                Swal.fire({
+                    title: 'No Riders Available',
+                    text: 'Sorry, there are no available riders for delivery at the moment. Please try again later.',
+                    icon: 'error',
+                    confirmButtonText: 'OK',
+                    confirmButtonColor: '#009914'
+                });
+                return;
+            }
+
+            // Confirm checkout if items are from the same restaurant and there are available riders
             Swal.fire({
                 title: 'Are you sure you want to checkout?',
                 text: 'You will not be able to make further changes once you proceed.',
@@ -205,5 +224,6 @@
         });
     });
 </script>
+
 
 {% endblock %}

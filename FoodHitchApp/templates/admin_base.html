@@ -37,6 +37,12 @@
             <a href="{% url 'admin_feedback_list' %}" class="{% if request.path == '/feedback/' %}active{% endif %}">
                 <ion-icon name="chatbox-ellipses-outline"></ion-icon>Feedbacks
             </a>
+            <a href="{% url 'admin_pending_proofs' %}" class="{% if request.path == '/pending-proofs/' %}active{% endif %}">
+                <ion-icon name="time-outline"></ion-icon>Pending Proofs of Payment
+            </a>            
+            <a href="{% url 'partner_request_list' %}" class="{% if request.path == '/partner-requests/' %}active{% endif %}">
+                <ion-icon name="folder-outline"></ion-icon>Proof of Payment History
+            </a>
         </div>
         <div class="sidebar-logout">
             <a href="{% url 'logout' %}" class="{% if request.path == '/customer_login/' %}active{% endif %}">

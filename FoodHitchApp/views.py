@@ -20,7 +20,7 @@ import os
 from django.conf import settings
 from decimal import Decimal
 from django.utils.timezone import now
-from .models import Order, PaymentProof
+from .models import Order
 from calendar import month_name
 from django.db.models import Sum
 import requests
@@ -612,13 +612,37 @@ def otp_verification(request):
 def customer_base(request):
     return render(request, "customer_base.html")
 
+# Initialize logger
+logger = logging.getLogger(__name__)
 @login_required
 def customer_track_order(request):
     # Fetch all delivery information, excluding deliveries with status 'Received'
-    deliveries = Delivery.objects.select_related('RiderID', 'RestaurantID').exclude(DeliveryStatus='Received')
+    deliveries = Delivery.objects.select_related('RiderID', 'RestaurantID', 'OrderID').exclude(DeliveryStatus='Received')
 
-    # Pass the filtered deliveries to the template
+    # Log the payment method for each delivery and get the restaurant's menu
+    for delivery in deliveries:
+        order = delivery.OrderID  # Assuming 'OrderID' is a foreign key to the Order model
+        
+        # Log the order information
+        if hasattr(order, 'id'):
+            order_id = order.id  # Default primary key
+        elif hasattr(order, 'order_id'):  # Custom primary key
+            order_id = order.order_id
+        else:
+            order_id = "Unknown"  # Fallback in case the primary key doesn't exist
+
+        logger.debug(f"Tracking Order ID: {order_id}, PaymentMethod: {order.PaymentMethod}")
+
+        # Fetch the restaurant's menu items based on the restaurant of the delivery
+        restaurant = delivery.RestaurantID
+        menu_items = Menu.objects.filter(restaurant=restaurant)  # Query the Menu model using the restaurant ID
+
+        # Add menu items to the delivery object
+        delivery.menu_items = menu_items
+
+    # Pass the filtered deliveries and menu items to the template
     return render(request, 'customer_track_order.html', {'deliveries': deliveries})
+
 
 logger = logging.getLogger(__name__)
 
@@ -988,8 +1012,13 @@ def get_cart_count(request):
 @login_required
 def view_cart(request):
     # Retrieve the logged-in customer's profile
-    customer = Customer.objects.get(user=request.user)
-    
+    try:
+        customer = Customer.objects.get(user=request.user)
+    except Customer.DoesNotExist:
+        # Handle the case where the Customer profile doesn't exist
+        # You might want to create a new customer or redirect them elsewhere
+        return redirect('create_customer_profile')  # Adjust as necessary
+
     # Fetch all cart items related to the current customer
     cart_items = CartItem.objects.filter(CustomerID=customer)
     total_price = 0
@@ -1000,19 +1029,18 @@ def view_cart(request):
         total_price += item_total_price  # Accumulate total price
         item.item_total_price = item_total_price  # Add total price for item to pass to template
 
+    # Determine if the cart has items and if all items are from the same restaurant
+    restaurant = None
     if cart_items.exists():
-        # Get the restaurant of the first menu item
         first_restaurant = cart_items[0].FoodID.restaurant
-        
-        # Check if all menu items in the cart are from the same restaurant
         all_same_restaurant = all(item.FoodID.restaurant == first_restaurant for item in cart_items)
         
         if all_same_restaurant:
             restaurant = first_restaurant
-        else:
-            restaurant = None
-    else:
-        restaurant = None
+    
+    # Check if there are available riders
+    available_riders = Rider.objects.filter(Availability='available')
+    no_available_riders = available_riders.count() == 0  # Flag to indicate if no riders are available
 
     # Pass the required data to the template
     context = {
@@ -1020,10 +1048,12 @@ def view_cart(request):
         'fullname': customer.CustomerName,
         'total_price': total_price,
         'restaurant': restaurant,
+        'no_available_riders': no_available_riders,  # Pass the flag to the template
     }
     
     # Render the cart page with the context
     return render(request, 'customer_cart.html', context)
+
 
 
 
@@ -1371,6 +1401,7 @@ def calculate_delivery_fee(request):
 
     return JsonResponse({'delivery_fee': delivery_fee})
 
+from django.db import transaction
 
 @login_required
 def place_order(request):
@@ -1387,6 +1418,7 @@ def place_order(request):
         if not cart_items.exists():
             messages.error(request, "Your cart is empty! Can't place an order.")
             return redirect('customer_home')
+        
         restaurant_ids = {item.FoodID.restaurant.RestaurantID for item in cart_items}
         if len(restaurant_ids) > 1:
             messages.error(request, "You cannot place an order with items from different restaurants.")
@@ -1401,180 +1433,194 @@ def place_order(request):
 
         if not address:
             messages.error(request, "Address is required to place an order.")
-            return redirect('place_order')
-
-        # Store the form data in session (convert Decimal to float for JSON compatibility)
-        request.session['order_form_data'] = {
-            'address': address,
-            'city': request.POST.get('city'),
-            'state': request.POST.get('state'),
-            'postal_code': request.POST.get('postal-code'),
-            'payment_option': payment_option,
-            'subtotal': float(subtotal),
-            'delivery_fee': float(delivery_fee),
-            'total_amount': float(total_amount)
-        }
+            return redirect('check_out')
 
         # Attempt to assign a rider with Availability "available" and Status "accepted"
         available_rider = Rider.objects.filter(Availability="available", Status="accepted").first()
 
-        # Handle payment option logic
+        if not available_rider:
+            messages.error(request, "No riders are available to take your order. Please try again later.")
+            return redirect('check_out')
+
+        # Handle Gcash Payment Logic
         if payment_option == 'gcash':
-            if not available_rider:
-                request.session['no_riders_available'] = True
-                return redirect('check_out')  # Redirect back to checkout if no rider is available
-            else:
-                return redirect('pay_with_gcash')  # Redirect to the Gcash payment page
-
-        elif payment_option == 'cod':
-            if not available_rider:
-                request.session['no_riders_available'] = True
-                return redirect('check_out')  # Redirect back to checkout if no rider is available
-
-        # Create initial order
-        order = Order(CustomerID=customer, OrderTotal=0, Date=timezone.now(), TransactionID='')
-        order.save()
-
-        # Calculate total order amount
-        total_order_amount = Decimal(0)
-        order_details = []
-        for item in cart_items:
-            item_total = Decimal(item.Quantity) * item.FoodID.Price
-            total_order_amount += item_total
-            order_details.append(f"{item.FoodID.FoodName} (Quantity: {item.Quantity})")
-
-        # Update order total
-        order.OrderTotal = total_order_amount
-        order.save()
-
-        # Calculate total payable amount
-        total_amount = total_order_amount + delivery_fee
-
-        # Create delivery record if a rider is available
-        if available_rider:
-            # Create the delivery record and associate it with the order
-            delivery = Delivery.objects.create(
-                CustomerID=customer,
-                RiderID=available_rider,
-                RestaurantID=cart_items.first().FoodID.restaurant,
-                Address=address,
-                OrderTotal=total_order_amount,
-                DeliveryFee=delivery_fee,
-                TotalPayableAmount=total_amount,
-                DeliveryStatus='Pending',
-                OrderID=order
-            )
-
-            # Create delivery items
-            for item in cart_items:
-                DeliveryItem.objects.create(Delivery=delivery, FoodID=item.FoodID, Quantity=item.Quantity)
-
-            # Notify rider via email
-            rider_email = available_rider.user.email
-            subject = 'New Order Notification'
-            customer_name = customer.CustomerName
-            restaurant_name = cart_items.first().FoodID.restaurant.RestaurantName
-            order_items = ", ".join(order_details)
-            message = (
-                f"You have a new order from {customer_name}.\n"
-                f"Restaurant: {restaurant_name}\n"
-                f"Items: {order_items}\n"
-                f"Address: {address}\n"
-                f"Delivery ID: {delivery.DeliveryID}"
-            )
+            proof_of_payment = request.FILES.get('proof_of_payment')
+            if not proof_of_payment:
+                messages.error(request, "Please upload proof of payment to complete your order.")
+                return redirect('check_out')
 
             try:
-                send_mail(subject, message, settings.EMAIL_HOST_USER, [rider_email])
+                # Use transaction to ensure data consistency
+                with transaction.atomic():
+                    order = Order.objects.create(
+                        CustomerID=customer,
+                        OrderTotal=subtotal,
+                        Date=timezone.now(),
+                        PaymentMethod='GCASH',
+                        PaymentStatus='Pending',
+                        ProofOfPayment=proof_of_payment,
+                    )
+                    delivery = Delivery.objects.create(
+                        CustomerID=customer,
+                        RiderID=available_rider,
+                        RestaurantID=cart_items.first().FoodID.restaurant,
+                        Address=address,
+                        OrderTotal=subtotal,
+                        DeliveryFee=delivery_fee,
+                        TotalPayableAmount=total_amount,
+                        DeliveryStatus='Pending',
+                        OrderID=order,
+                    )
+                    # Create DeliveryItem objects for each food item in the cart
+                    for item in cart_items:
+                        DeliveryItem.objects.create(
+                            Delivery=delivery,
+                            FoodID=item.FoodID,
+                            Quantity=item.Quantity
+                        )
+
+                    cart_items.delete()
+
+                # Notify the rider (email example placeholder)
+                try:
+                    subject = "New Order Assigned"
+                    message = "You have been assigned a new order. Please check your account for details."
+                    send_mail(subject, message, settings.EMAIL_HOST_USER, [available_rider.email])
+                except Exception as e:
+                    messages.error(request, "Failed to send email notification to the rider.")
+                    logger.error(f"Email send error: {e}")
+
+                # Award points to customer
+                points_earned = calculate_points_earned(total_amount)
+                customer.Points += points_earned
+                customer.save()
+
+                messages.success(request, f"Your order has been placed successfully and is awaiting payment approval. You earned {points_earned:.1f} points!")
+                return redirect('customer_home')
+
             except Exception as e:
-                messages.error(request, "Failed to send email notification.")
-                print(f"Email send error: {e}")
+                messages.error(request, "An error occurred while placing your order.")
+                logger.error(f"GCash Order Error: {e}")
+                return redirect('check_out')
 
-            # Store rider notifications in session
-            request.session['rider_notifications'] = request.session.get('rider_notifications', [])
-            request.session['rider_notifications'].append({
-                'message': f"New order from {customer_name} at {restaurant_name}: {order_items}.",
-                'timestamp': timezone.now().strftime('%Y-%m-%d %H:%M:%S')
-            })
+        # Handle Cash on Delivery Logic
+        elif payment_option == 'cod':
+            try:
+                with transaction.atomic():
+                    order = Order.objects.create(
+                        CustomerID=customer,
+                        OrderTotal=subtotal,
+                        Date=timezone.now(),
+                        PaymentMethod='COD',
+                        PaymentStatus='Approved',
+                    )
+                    delivery = Delivery.objects.create(
+                        CustomerID=customer,
+                        RiderID=available_rider,
+                        RestaurantID=cart_items.first().FoodID.restaurant,
+                        Address=address,
+                        OrderTotal=subtotal,
+                        DeliveryFee=delivery_fee,
+                        TotalPayableAmount=total_amount,
+                        DeliveryStatus='Pending',
+                        OrderID=order,
+                    )
+                    # Create DeliveryItem objects for each food item in the cart
+                    for item in cart_items:
+                        DeliveryItem.objects.create(
+                            Delivery=delivery,
+                            FoodID=item.FoodID,
+                            Quantity=item.Quantity
+                        )
 
-            # Mark rider as unavailable after assignment
-            available_rider.Availability = 'unavailable'
-            available_rider.save()
+                    cart_items.delete()
 
-        # Calculate points earned
-        points_earned = Decimal(0)
-        if total_amount < 50:
-            points_earned = Decimal(0.1)
-        elif 50 <= total_amount < 100:
-            points_earned = Decimal(0.5)
-        else:
-            points_earned = (total_amount // Decimal(100)) * Decimal(1.0)
-            if total_amount % Decimal(100) >= Decimal(50):
-                points_earned += Decimal(0.5)
+                # Notify the rider (email example placeholder)
+                try:
+                    subject = "New Order Assigned"
+                    message = "You have been assigned a new order. Please check your account for details."
+                    send_mail(subject, message, settings.EMAIL_HOST_USER, [available_rider.email])
+                except Exception as e:
+                    messages.error(request, "Failed to send email notification to the rider.")
+                    logger.error(f"Email send error: {e}")
 
-        # Update customer points
-        customer.Points += points_earned
-        customer.save()
+                # Award points to customer
+                points_earned = calculate_points_earned(total_amount)
+                customer.Points += points_earned
+                customer.save()
 
-        # Clear the cart
-        cart_items.delete()
+                messages.success(request, f"Your order has been placed successfully! You earned {points_earned:.1f} points.")
+                return redirect('customer_home')
 
-        # Success message with points earned
-        messages.success(request, f"Your order has been placed successfully! You earned {points_earned:.1f} points.")
-        return redirect('customer_home')
+            except Exception as e:
+                messages.error(request, "An error occurred while placing your order.")
+                logger.error(f"COD Order Error: {e}")
+                return redirect('check_out')
+
+        messages.error(request, "Invalid payment option selected.")
+        return redirect('check_out')
 
     return redirect('customer_home')
 
 
 
-def submit_payment_proof(request, order_id):
-    try:
-        order = Order.objects.get(OrderID=order_id)
-    except Order.DoesNotExist:
-        messages.error(request, "Order not found.")
-        return redirect('customer_home')
+def calculate_points_earned(total_amount):
+    points = Decimal(0)
+    if total_amount < 50:
+        points = Decimal(0.1)
+    elif 50 <= total_amount < 100:
+        points = Decimal(0.5)
+    else:
+        points = (total_amount // Decimal(100)) * Decimal(1.0)
+        if total_amount % Decimal(100) >= Decimal(50):
+            points += Decimal(0.5)
+    return points
 
-    if order.PaymentMethod != 'gcash':
-        return redirect('customer_home')
+@login_required
+def admin_pending_proofs(request):
+    # Query orders with PaymentMethod 'gcash' and PaymentStatus 'Pending'
+    orders = Order.objects.filter(PaymentStatus='Pending', PaymentMethod='GCASH')
 
-    # Check if a payment proof already exists for this order
-    if order.ProofOfPayment:
-        messages.error(request, "A payment proof for this order has already been submitted.")
-        return redirect('pay_with_gcash', order_id=order.OrderID)
+    # Add TotalPayableAmount from related Delivery object to each order
+    for order in orders:
+        try:
+            # Fetch the related Delivery object for the Order
+            delivery = Delivery.objects.get(OrderID=order)
+            order.TotalPayableAmount = delivery.TotalPayableAmount  # Adding this attribute to each order
+        except Delivery.DoesNotExist:
+            order.TotalPayableAmount = None  # If no delivery, set it to None (or handle accordingly)
 
-    if request.method == 'POST' and request.FILES.get('payment-proof'):
-        payment_proof_file = request.FILES['payment-proof']
-        
-        # Save the new payment proof to the Order model
-        order.ProofOfPayment = payment_proof_file
-        order.PaymentStatus = 'Pending'  # Set payment status to 'Pending' for admin review
-        order.save()
+    # Get the notifications count for the admin
+    notifications = get_notifications()
+    notification_count = len(notifications)
 
-        # Assign a rider but mark payment status as pending
-        rider = order.get_assigned_rider()
-        if rider:
-            # Logic to assign the rider but with "Pending" status
-            order.DeliveryStatus = 'Pending'
-            order.save()
-
-        messages.success(request, "Payment proof submitted successfully! Our team will verify it shortly.")
-        return redirect('customer_home')  # Or redirect to a confirmation page
-
-    return render(request, 'submit_payment_proof.html', {'order': order})
-
+    return render(request, 'admin_pending_proofs.html', {
+        'orders': orders,
+        'notification_count': notification_count
+    })
 
 
 @login_required
-def pay_with_gcash(request):
-    # Retrieve the latest order for the logged-in customer
-    customer = request.user.customer
-    order = Order.objects.filter(CustomerID=customer).order_by('-Date').first()
+def approve_payment_proof(request, order_id):
+    try:
+        order = Order.objects.get(OrderID=order_id, PaymentStatus='Pending')
+        order.PaymentStatus = 'Approved'
+        order.save()
+        return redirect('admin_pending_proofs')  # Redirect back to the list of pending proofs
+    except Order.DoesNotExist:
+        # Handle the case where the order doesn't exist or is not in Pending status
+        return redirect('admin_pending_proofs')
 
-    if not order:
-        messages.error(request, "No active order found.")
-        return redirect('customer_home')
-
-    return render(request, 'pay_with_gcash.html', {'order': order})
-
+@login_required
+def disapprove_payment_proof(request, order_id):
+    try:
+        order = Order.objects.get(OrderID=order_id, PaymentStatus='Pending')
+        order.PaymentStatus = 'Disapproved'
+        order.save()
+        return redirect('admin_pending_proofs')  # Redirect back to the list of pending proofs
+    except Order.DoesNotExist:
+        # Handle the case where the order doesn't exist or is not in Pending status
+        return redirect('admin_pending_proofs')
 
 
 
@@ -1677,25 +1723,31 @@ def order_history(request):
         # Create a dictionary to store the unique delivery info
         order_info = {
             'OrderID': delivery.OrderID,  # Make sure this is the OrderID from the Order model
-            'RestaurantName': delivery.delivery_items.first().FoodID.restaurant.RestaurantName,
+            'RestaurantName': None,  # Default to None in case there are no items
             'RiderID': delivery.RiderID,
             'Date': delivery.Date,
             'DeliveryStatus': delivery.DeliveryStatus,
             'TotalPayableAmount': delivery.TotalPayableAmount,
             'Items': []
         }
-        
-        # Add each item to the Items list
-        for item in delivery.delivery_items.all():
-            order_info['Items'].append({
-                'FoodID': item.FoodID,
-                'Quantity': item.Quantity
-            })
+
+        # Ensure there are delivery items to prevent NoneType errors
+        if delivery.delivery_items.exists():  # Check if there are any related delivery items
+            # Set the restaurant name using the first food item if available
+            order_info['RestaurantName'] = delivery.delivery_items.first().FoodID.restaurant.RestaurantName
+            
+            # Add each item to the Items list
+            for item in delivery.delivery_items.all():
+                order_info['Items'].append({
+                    'FoodID': item.FoodID,
+                    'Quantity': item.Quantity
+                })
 
         order_details.append(order_info)
 
     # Pass the order details to the template
     return render(request, 'customer_order_history.html', {'orders': order_details})
+
 
 @login_required
 def submit_feedback(request, delivery_id):
@@ -1924,7 +1976,12 @@ def rider_transactions(request):
     rider = request.user.rider
 
     # Get all delivery records assigned to this rider excluding 'Received' status
-    deliveries = Delivery.objects.filter(RiderID=rider).exclude(DeliveryStatus='Received').prefetch_related('delivery_items')
+    deliveries = Delivery.objects.filter(RiderID=rider).exclude(DeliveryStatus='Received').select_related('RestaurantID').prefetch_related('delivery_items__FoodID')
+
+    # Log deliveries and items to check if they contain the expected data
+    for delivery in deliveries:
+        for delivery_item in delivery.delivery_items.all():
+            logger.debug(f"Delivery ID: {delivery.DeliveryID}, Food: {delivery_item.FoodID.FoodName}, Quantity: {delivery_item.Quantity}")
 
     # Pass the deliveries and rider to the template
     context = {
@@ -1934,6 +1991,8 @@ def rider_transactions(request):
     }
 
     return render(request, "rider_transactions.html", context)
+
+
 
 @csrf_exempt  # Ensure that CSRF protection issues are handled correctly
 def update_delivery_status(request):

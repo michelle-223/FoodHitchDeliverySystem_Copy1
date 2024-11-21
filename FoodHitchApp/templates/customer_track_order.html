@@ -17,37 +17,20 @@
                 <p class="status"><strong> Delivery Status:</strong> <span class="status-indicator status-in-transit">{{ delivery.DeliveryStatus }}</span></p>
                 <p><strong>Address:</strong> {{ delivery.Address }} </p>
                 <p><strong>Restaurant Name:</strong> {{ delivery.RestaurantID }} </p>
+                <p><strong>Ordered Menu:</strong></p>
+                    {% for delivery_item in delivery.delivery_items.all %}
+                        <li>
+                            {{ delivery_item.FoodID.FoodName }} - x{{ delivery_item.Quantity }} 
+                            (Price: {{ delivery_item.FoodID.Price }})
+                        </li>
+                    {% endfor %}
                 <p><strong>Total Payable:</strong> ₱{{ delivery.TotalPayableAmount }} </p>
                 <p><strong>Order Date:</strong> {{ delivery.Date|date:"F j, Y, g:i a" }} </p>
+                <p><strong>Payment Method:</strong> {{ delivery.OrderID.PaymentMethod }}</p>
+                <p><strong>Payment Status:</strong> {{ delivery.OrderID.PaymentStatus }}</p> <!-- Display Payment Status -->
             </div>
-
-            <p><strong>Payment Method:</strong> 
-                {% if delivery.PaymentMethod == 'gcash' %}
-                    Gcash
-                {% else %}
-                    Cash on Delivery
-                {% endif %}
-            </p>
-        
-            {% if delivery.PaymentMethod == 'gcash' %}
-                <p><strong>Payment Status:</strong> 
-                    {% if delivery.PaymentStatus == 'Pending' %}
-                        Pending (Awaiting Admin Approval)
-                    {% elif delivery.PaymentStatus == 'Approved' %}
-                        Approved (Ready for Shipping)
-                    {% elif delivery.PaymentStatus == 'Disapproved' %}
-                        Disapproved (Order Cancelled)
-                    {% else %}
-                        N/A
-                    {% endif %}
-                </p>
-            {% endif %}
-            
             <button class="track-button" onclick="trackRider('{{ delivery.RiderID.RiderID }}')">Track Rider Location</button>
-
             <button class="chat-button" onclick="openChat('{{ delivery.RiderID.RiderID }}')">Chat with Rider</button>
-        
-        
             {% if delivery.DeliveryStatus == 'Delivered' %}
                 <button class="update-status-button" onclick="updateDeliveryStatus('{{ delivery.DeliveryID }}')">Received</button>
             {% endif %}

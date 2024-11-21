@@ -98,7 +98,7 @@
       <h1>Pay with GCash</h1>
       <p>Scan the QR code below and upload your proof of payment:</p>
       <img src="{% static 'images/qr.jpeg' %}" alt="Gcash QR Code" class="qr-code">
-      <form method="POST" enctype="multipart/form-data" action="{% url 'submit_payment_proof' order_id=order.OrderID %}">
+      <form action="{% url 'submit_payment_proof' order_id=order.OrderID %}" method="POST" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="form-group">
           <label for="payment-proof">Upload Payment Proof:</label>

@@ -113,7 +113,127 @@
     .hidden {
       display: none;
     }
-  </style>
+
+
+  
+/* Container Styling */
+.container1 {
+    font-family: 'Arial', sans-serif;
+    background-color: #f5f5f5;
+    margin: 0 auto;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 430px;
+    max-width: 500px;
+    width: 80%;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    margin-top: auto;
+}
+
+/* Title */
+h1 {
+    font-size: 1.8rem;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+/* Instructions */
+p {
+    font-size: 1rem;
+    color: #555;
+    margin-bottom: 1rem;
+}
+
+/* QR Code Styling */
+.qr-code {
+    margin: 1.5rem 0;
+    width: 100%;
+    max-width: 200px;
+    height: auto;
+    border-radius: 8px;
+}
+
+/* Form Group */
+.form-group {
+    margin-bottom: 1.5rem;
+    width: 100%;
+    text-align: left;
+}
+
+/* Label */
+.form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: #333;
+}
+
+/* File Input */
+.form-group input[type="file"] {
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+/* Focus Effect */
+.form-group input[type="file"]:focus {
+    border-color: #007bff;
+    outline: none;
+}
+
+/* Submit Button */
+.submit-btn {
+    background-color: #007bff;
+    color: #fff;
+    padding: 0.8rem 1.5rem;
+    border: none;
+    border-radius: 5px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+/* Button Hover Effect */
+.submit-btn:hover {
+    background-color: #0056b3;
+}
+
+/* Error Message */
+.error-message {
+    color: #ff0000;
+    font-size: 1rem;
+    margin-top: 1rem;
+    text-align: center;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container1 {
+        width: 100%;
+        max-width: 400px;
+        padding: 1rem;
+    }
+
+    h1 {
+        font-size: 1.6rem;
+    }
+
+    .submit-btn {
+        font-size: 1rem;
+        padding: 0.7rem 1.2rem;
+    }
+}
+    </style>
+
 </head>
 <body>
   <div class="header">
@@ -127,7 +247,7 @@
 
   <div class="container">
     <p>Complete the details to proceed.</p>
-    <form id="checkout-form" method="POST" action="{% url 'place_order' %}">
+    <form id="checkout-form" method="POST" action="{% url 'place_order' %}" enctype="multipart/form-data">
       {% csrf_token %}
       <label for="customer-name">Customer Name:</label>
       <input type="text" id="customer-name" name="customer-name" value="{{ customer.CustomerName }}" readonly>
@@ -165,38 +285,54 @@
       <div class="payment-options">
         <div class="payment-option" style="margin-left: 80px;">
           <label>
-            <input type="radio" name="payment-option" value="gcash" checked>
+            <input type="radio" id="payment-method-gcash" name="payment-option" value="gcash" onclick="toggleGcashFields()" checked>
             <img src="{% static 'images/gcash.png' %}" alt="Pay with Gcash">
           </label>
         </div>
         <div class="payment-option" style="margin-left: 300px; margin-top: -118px;">
           <label>
-            <input type="radio" name="payment-option" value="cod">
+            <input type="radio" id="payment-method-cod" name="payment-option" value="cod" onclick="toggleGcashFields()">
             <img src="{% static 'images/CASH.png' %}" alt="Cash On Delivery">
           </label>
         </div>
       </div>
-      <button type="button" id="confirm-order">Place Order</button>
-      <div id="paypal-button-container" class="hidden">
-        <!-- PayPal button container -->
+
+        <div id="gcash_fields">
+          <div class="container1">
+              <h1>Pay with GCash</h1>
+              <p>Scan the QR code below and upload your proof of payment:</p>
+              <img src="{% static 'images/qr.jpeg' %}" alt="Gcash QR Code" class="qr-code">
+
+                  <div class="form-group">
+                      <label for="payment-proof">Please upload the Proof of Payment:</label>
+                      <input type="file" id="payment-proof" name="proof_of_payment" accept="image/*" required>    
       </div>
+    </div>
+      
+      
+      </div>
+      <button type="button" id="confirm-order">Place Order</button>
+
     </form>
   </div>
 
-  {% if request.session.no_riders_available %}
-  <script>
-    Swal.fire({
-      icon: 'error',
-      title: 'No Riders Available',
-      text: 'Sorry, there are no available riders for delivery at the moment. Please try again later.',
-    });
-  </script>
-{% endif %}
 
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <script>
+function toggleGcashFields() {
+    const selectedPaymentOption = document.querySelector('input[name="payment-option"]:checked').value;
+    const gcashFields = document.getElementById('gcash_fields');
+    if (selectedPaymentOption === 'gcash') {
+        gcashFields.style.display = 'block';
+    } else {
+        gcashFields.style.display = 'none';
+    }
+}
+
+// Trigger the toggle function on page load to set the initial state
+document.addEventListener('DOMContentLoaded', toggleGcashFields);
 
 
     function goBack() {
@@ -323,26 +459,39 @@
 
     document.getElementById('confirm-order').addEventListener('click', function () {
       var selectedPaymentOption = document.querySelector('input[name="payment-option"]:checked').value;
+      const paymentProof = document.getElementById('payment-proof');
+
     
-    if (selectedPaymentOption === 'gcash') {
-        // SweetAlert for Gcash confirmation
+      if (selectedPaymentOption === 'gcash') {
+    const paymentProof = document.getElementById('payment-proof');
+    
+    if (!paymentProof.value) {
+        // SweetAlert for missing payment proof
         Swal.fire({
-            title: 'Confirm Gcash Payment',
-            text: 'You will be redirected to the payment page to complete your order with Gcash. Are you sure you want to proceed?',
-            icon: 'info',
-            showCancelButton: true,
-            confirmButtonText: 'Yes, proceed',
-            cancelButtonText: 'No, go back'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // Submit the form to proceed with Gcash payment
-                document.getElementById('checkout-form').submit();
-            } else if (result.isDenied || result.isDismissed) {
-                // Optionally handle cancellation
-                Swal.fire('Order not placed', 'You can continue editing your order.', 'info');
-            }
+            icon: 'error',
+            title: 'Missing Payment Proof',
+            text: 'Please upload your GCash payment proof before placing the order.',
         });
-        } else if (selectedPaymentOption === 'cod') {
+        return; // Stop further processing if payment proof is missing
+    }
+
+    Swal.fire({
+    title: 'Confirm Gcash Payment',
+    text: 'Are you sure you want to place your order with GCash?',
+    icon: 'info',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, place order',
+    cancelButtonText: 'No, go back'
+}).then((result) => {
+    if (result.isConfirmed) {
+        // Manually trigger form submission
+        document.getElementById('checkout-form').submit();
+    }
+});
+
+}
+
+ else if (selectedPaymentOption === 'cod') {
           // SweetAlert for COD confirmation
           Swal.fire({
             title: 'Confirm Cash on Delivery',

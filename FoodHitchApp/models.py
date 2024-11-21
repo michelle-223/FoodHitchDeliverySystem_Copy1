@@ -154,29 +154,28 @@ class Delivery(models.Model):
 
 
 class Order(models.Model):
+    ORDER_PAYMENT_STATUS_CHOICES = [
+        ('Pending', 'Pending'),
+        ('Approved', 'Approved'),
+        ('Disapproved', 'Disapproved'),
+    ]
+    PAYMENT_METHOD_CHOICES = [
+        ('cod', 'Cash on Delivery'),
+        ('gcash', 'Gcash'),
+    ]
+
     OrderID = models.BigAutoField(primary_key=True)
     CustomerID = models.ForeignKey('Customer', on_delete=models.CASCADE)
     OrderTotal = models.DecimalField(max_digits=10, decimal_places=2)
     Date = models.DateTimeField(auto_now_add=True)
     TransactionID = models.CharField(max_length=20, unique=True, default='')
-
-    PAYMENT_METHOD_CHOICES = [
-        ('cod', 'Cash on Delivery'),
-        ('gcash', 'Gcash'),
-    ]
-    
     PaymentMethod = models.CharField(
-        max_length=10,
-        choices=PAYMENT_METHOD_CHOICES,
-        default='cod'  # Default to 'Cash on Delivery'
+        max_length=10, choices=PAYMENT_METHOD_CHOICES, default='cod'
     )
-    
-    # Proof of payment only required for Gcash payments
-    ProofOfPayment = models.ImageField(
-        upload_to='proof_of_payment/',  # Save uploaded images to a 'proof_of_payment/' directory
-        blank=True,          # Allow this field to be optional
-        null=True            # Allow storing NULL when there's no proof (e.g., for COD)
+    PaymentStatus = models.CharField(
+        max_length=12, choices=ORDER_PAYMENT_STATUS_CHOICES, default='Pending'
     )
+    ProofOfPayment = models.ImageField(upload_to='proof_of_payment/', blank=True, null=True)
 
     def save(self, *args, **kwargs):
         if not self.TransactionID:
@@ -186,22 +185,8 @@ class Order(models.Model):
     def generate_transaction_id(self):
         return ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
 
-    def get_assigned_rider(self):
-        # Logic to retrieve an assigned rider (placeholder)
-        return Rider.objects.first()
-
     def __str__(self):
-        return str(self.OrderID)
-
-    
-
-class PaymentProof(models.Model):
-    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="payment_proof")
-    proof_image = models.ImageField(upload_to='payment_proofs/')
-    uploaded_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Payment proof for Order {self.order.OrderID}"
+        return f"Order {self.OrderID}"
 
 
 class DeliveryItem(models.Model):
@@ -214,8 +199,6 @@ class DeliveryItem(models.Model):
 
     def __str__(self):
         return f"{self.FoodID.FoodName} (x{self.Quantity})"
-
-
 
 class CustomersFeedback(models.Model):
     FEEDBACK_STATUS_CHOICES = [
