@@ -14,7 +14,7 @@ SECRET_KEY = 'django-insecure-k00k)-o35fy_@j3v!xj)#v=h3+4t0^ue#+4_$^gm8^kj-s@kl^
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["FoodHitchDelivery.up.railway.app", "127.0.0.1"]
+ALLOWED_HOSTS = []
 
 # Application definition
 
