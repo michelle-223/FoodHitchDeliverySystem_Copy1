@@ -1080,9 +1080,6 @@ def view_cart(request):
     return render(request, 'customer_cart.html', context)
 
 
-
-
-
 @login_required
 @require_POST
 def remove_cart_item(request, item_id):
@@ -1774,7 +1771,10 @@ def order_completed(request):
 
 
 def reorder(request, order_id):
-    # Get the order using OrderID
+    # Strip the "Order" prefix and any extra spaces (e.g., "Order 2" -> "2")
+    order_id = order_id.replace("Order", "").strip()
+
+    # Get the order using the cleaned OrderID
     order = get_object_or_404(Order, OrderID=order_id)
 
     # Retrieve deliveries associated with this order
@@ -1802,15 +1802,17 @@ def reorder(request, order_id):
     return redirect('view_cart')
 
 
+
+
 @login_required
 def order_history(request):
     # Get the customer instance based on the logged-in user
     customer = Customer.objects.get(user=request.user)
     
-    # Get all deliveries related to the current customer with status 'Received' or 'Cancelled'
+    # Get all deliveries related to the current customer with status 'Received', excluding 'Cancelled'
     deliveries = Delivery.objects.filter(
         CustomerID=customer,
-        DeliveryStatus__in=['Received', 'Cancelled']
+        DeliveryStatus='Received'  # Only include 'Received' deliveries
     ).prefetch_related('delivery_items').select_related('RiderID', 'RestaurantID')
 
     if not deliveries:
@@ -1856,6 +1858,7 @@ def order_history(request):
 
     # Pass the order details to the template
     return render(request, 'customer_order_history.html', {'orders': order_details})
+
 
 
 
@@ -2056,14 +2059,15 @@ def rider_profile_update(request):
 @login_required
 def rider_delivery_history(request):
     rider = request.user.rider
+    
     # Assuming get_rider_notifications fetches the notifications already
     rider_notifications = get_rider_notifications(rider.RiderID)
     notification_count = len(rider_notifications)
 
-    # Include 'Cancelled' deliveries in the history
+    # Exclude 'Cancelled' deliveries from the history
     deliveries = Delivery.objects.filter(
         RiderID=rider, 
-        DeliveryStatus__in=['Received', 'Cancelled'], 
+        DeliveryStatus__in=['Received'],  # Only include 'Received' deliveries, exclude 'Cancelled'
         is_archived=False
     )
 
@@ -2079,6 +2083,7 @@ def rider_delivery_history(request):
     }
 
     return render(request, 'rider_delivery_history.html', context)
+
 
 
 

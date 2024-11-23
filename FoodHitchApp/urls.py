@@ -103,7 +103,7 @@ urlpatterns = [
     path('order-history/', order_history, name='order_history'),
     path('reward_points/', customer_reward_points, name='customer_reward_points'),
     path('rider/earnings/', rider_earnings, name='rider_earnings'),
-    path('reorder/<int:order_id>/', reorder, name='reorder'),
+    path('reorder/<str:order_id>/', reorder, name='reorder'),
      path('update_availability/', update_availability, name='update_availability'),
      path('remove_favorite/<int:food_id>/', remove_favorite, name='remove_favorite'),
 
