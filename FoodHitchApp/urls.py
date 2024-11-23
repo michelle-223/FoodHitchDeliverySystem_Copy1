@@ -61,8 +61,8 @@ from .views import (
     delete_rider,
     update_delivery_status,
     rider_earnings,
-    rider_notifications,
-    update_store_owner_profile, reorder, update_availability, password_reset_request, password_reset_set,
+    rider_notifications, notify_rider_view, 
+    update_store_owner_profile, reorder, update_availability, password_reset_request, password_reset_set, 
     check_username, remove_favorite, order_completed, verify_otp, owner_restaurants, archive_delivery, rider_archived_deliveries,
     customer_chat, send_message, rider_chat, delete_conversation, admin_pending_proofs, approve_payment_proof, disapprove_payment_proof
 )
@@ -162,6 +162,7 @@ urlpatterns = [
     path('pending-proofs/', admin_pending_proofs, name='admin_pending_proofs'),
     path('approve_payment_proof/<int:order_id>/', approve_payment_proof, name='approve_payment_proof'),
     path('disapprove_payment_proof/<int:order_id>/', disapprove_payment_proof, name='disapprove_payment_proof'),
+    path('notify-rider/<int:delivery_id>/', notify_rider_view, name='notify_rider'),
 
 
 

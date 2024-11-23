@@ -10,6 +10,7 @@ from django.http import JsonResponse, HttpResponseRedirect, HttpResponse, Http40
 import json
 from paypal.standard.models import ST_PP_COMPLETED  # Import PayPal status
 import random
+from datetime import datetime
 from django.db.models.functions import ExtractMonth, TruncMonth, TruncDate, TruncDay, TruncWeek
 from django.contrib.auth.hashers import make_password
 from .forms import PasswordResetForm, PasswordSetForm
@@ -612,12 +613,28 @@ def otp_verification(request):
 def customer_base(request):
     return render(request, "customer_base.html")
 
-# Initialize logger
-logger = logging.getLogger(__name__)
 @login_required
 def customer_track_order(request):
     # Fetch all delivery information, excluding deliveries with status 'Received'
     deliveries = Delivery.objects.select_related('RiderID', 'RestaurantID', 'OrderID').exclude(DeliveryStatus='Received')
+
+    # Filter out deliveries with status 'Cancelled' and update the Order model
+    for delivery in deliveries[:]:
+        if delivery.DeliveryStatus == 'Cancelled':
+            # Update the corresponding order with delivery details
+            order = delivery.OrderID
+            order.RestaurantID = delivery.RestaurantID
+            order.RiderID = delivery.RiderID
+            order.DeliveryStatus = delivery.DeliveryStatus
+            order.TotalPayableAmount = delivery.TotalPayableAmount
+            order.save()  # Save the updated order
+
+            # Optionally, archive the canceled delivery (set is_archived to True)
+            delivery.is_archived = True
+            delivery.save()
+
+            # Remove canceled deliveries from the list to avoid rendering them
+            deliveries = deliveries.exclude(DeliveryID=delivery.DeliveryID)  # Remove from the list to avoid rendering it
 
     # Log the payment method for each delivery and get the restaurant's menu
     for delivery in deliveries:
@@ -642,6 +659,7 @@ def customer_track_order(request):
 
     # Pass the filtered deliveries and menu items to the template
     return render(request, 'customer_track_order.html', {'deliveries': deliveries})
+
 
 
 logger = logging.getLogger(__name__)
@@ -672,29 +690,33 @@ def rider_base(request):
 
 @login_required
 def rider_home(request):
-    # Retrieve notifications from the session
-    rider_notifications = request.session.get('rider_notifications', [])
+    rider = Rider.objects.get(user=request.user)
+
+    # Get notifications for the rider using a custom function (assuming you have this function)
+    rider_notifications = get_rider_notifications(rider.RiderID)
+
+    # Calculate notification count
     notification_count = len(rider_notifications)
 
     feedbacks = CustomersFeedback.objects.filter(Status='approved').order_by('-Date')[:10]
-
-    rider = Rider.objects.get(user=request.user)
 
     context = {
         'feedbacks': feedbacks,
         'notification_count': notification_count,
         'rider': rider,
+        'rider_notifications': rider_notifications,  # Optional, to display in the template
     }
 
     return render(request, 'rider_home.html', context)
 
+
 @login_required
 def rider_earnings(request):
-    rider_notifications = request.session.get('rider_notifications', [])
+    rider = Rider.objects.get(user=request.user)
+    rider_notifications = get_rider_notifications(rider.RiderID)
     notification_count = len(rider_notifications)
     
-    # Get the Rider instance linked to the logged-in user
-    rider = Rider.objects.get(user=request.user)
+    # Get the Rider instance linked to the logged-in use
 
     # Get the selected date
     selected_date = request.GET.get('date', None)
@@ -779,7 +801,9 @@ def rider_earnings(request):
 @login_required
 def update_rider_profile(request):
     # Retrieve notifications from the session
-    rider_notifications = request.session.get('rider_notifications', [])
+    rider = Rider.objects.get(user=request.user)
+    rider_notifications = get_rider_notifications(rider.RiderID)
+    
     notification_count = len(rider_notifications)
 
     rider_profile = get_object_or_404(Rider, user=request.user)
@@ -823,6 +847,7 @@ def update_rider_profile(request):
         'success': success,
         'error_message': error_message,
         'notification_count': notification_count,  # Include the notification count here
+        'rider_notifications': rider_notifications,
     })
 
 @login_required
@@ -1611,18 +1636,58 @@ def approve_payment_proof(request, order_id):
         # Handle the case where the order doesn't exist or is not in Pending status
         return redirect('admin_pending_proofs')
 
+from django.contrib import messages  # Import Django messages framework
+from django.shortcuts import redirect
+
 @login_required
 def disapprove_payment_proof(request, order_id):
     try:
+        # Fetch the order with the given ID and ensure it's in 'Pending' status
         order = Order.objects.get(OrderID=order_id, PaymentStatus='Pending')
         order.PaymentStatus = 'Disapproved'
         order.save()
-        return redirect('admin_pending_proofs')  # Redirect back to the list of pending proofs
+
+        # Update the related delivery status to 'Cancelled'
+        try:
+            delivery = Delivery.objects.get(OrderID=order)
+            delivery.DeliveryStatus = 'Cancelled'
+            delivery.save()
+
+            # Create a message for the rider (or user in this case)
+            rider = delivery.RiderID  # Assuming the rider is related to the delivery
+            messages.info(request, f"Your delivery for OrderID {order.OrderID} has been cancelled due to payment disapproval.")
+
+        except Delivery.DoesNotExist:
+            # Handle the case where no delivery is found
+            pass
+
+        # Redirect back to the list of pending proofs
+        return redirect('admin_pending_proofs')
     except Order.DoesNotExist:
         # Handle the case where the order doesn't exist or is not in Pending status
         return redirect('admin_pending_proofs')
 
 
+
+@login_required
+def notify_rider_view(request, delivery_id):
+    """
+    Trigger a notification for the rider based on the delivery ID.
+    """
+    try:
+        # Fetch the delivery record
+        delivery = Delivery.objects.get(DeliveryID=delivery_id)
+
+        # Notify the rider
+        Notification.objects.create(
+            RiderID=delivery.RiderID,
+            message=f"Delivery ID {delivery.DeliveryID} for Order ID {delivery.OrderID.OrderID} has been cancelled.",
+            timestamp=datetime.now(),
+        )
+
+        return JsonResponse({"status": "success", "message": "Notification sent to the rider."})
+    except Delivery.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "Delivery not found."})
 
 @login_required
 def order_completed(request):
@@ -1710,19 +1775,29 @@ def reorder(request, order_id):
     return redirect('view_cart')
 
 
+@login_required
 def order_history(request):
     # Get the customer instance based on the logged-in user
     customer = Customer.objects.get(user=request.user)
     
-    # Get all deliveries related to the current customer with status 'Received'
-    deliveries = Delivery.objects.filter(CustomerID=customer, DeliveryStatus='Received').prefetch_related('delivery_items').select_related('RiderID', 'RestaurantID')
+    # Get all deliveries related to the current customer with status 'Received' or 'Cancelled'
+    deliveries = Delivery.objects.filter(
+        CustomerID=customer,
+        DeliveryStatus__in=['Received', 'Cancelled']
+    ).prefetch_related('delivery_items').select_related('RiderID', 'RestaurantID')
+
+    if not deliveries:
+        logger.debug("No deliveries found for customer: %s", customer.id)
 
     # Create a list to store the order details
     order_details = []
     for delivery in deliveries:
-        # Create a dictionary to store the unique delivery info
+        # Log the delivery status and ensure data processing
+        logger.debug(f"Delivery ID: {delivery.DeliveryID}, Status: {delivery.DeliveryStatus}")
+
+        # Create a dictionary to store delivery information
         order_info = {
-            'OrderID': delivery.OrderID,  # Make sure this is the OrderID from the Order model
+            'OrderID': delivery.OrderID,  # Ensure this is the OrderID from the Order model
             'RestaurantName': None,  # Default to None in case there are no items
             'RiderID': delivery.RiderID,
             'Date': delivery.Date,
@@ -1731,8 +1806,8 @@ def order_history(request):
             'Items': []
         }
 
-        # Ensure there are delivery items to prevent NoneType errors
-        if delivery.delivery_items.exists():  # Check if there are any related delivery items
+        # Process delivery items
+        if delivery.delivery_items.exists():
             # Set the restaurant name using the first food item if available
             order_info['RestaurantName'] = delivery.delivery_items.first().FoodID.restaurant.RestaurantName
             
@@ -1742,11 +1817,20 @@ def order_history(request):
                     'FoodID': item.FoodID,
                     'Quantity': item.Quantity
                 })
+        else:
+            logger.debug(f"Delivery {delivery.DeliveryID} has no items.")
 
+        # Add the delivery info to the list
         order_details.append(order_info)
+
+    # If no order details are found, log it
+    if not order_details:
+        logger.debug("No order details found for customer.")
 
     # Pass the order details to the template
     return render(request, 'customer_order_history.html', {'orders': order_details})
+
+
 
 
 @login_required
@@ -1826,25 +1910,43 @@ def get_notifications():
 
     return notifications
 
+
 def get_rider_notifications(rider_id):
     notifications = []
-    
-    # Fetch the rider using the provided rider ID
+
     try:
         rider = Rider.objects.get(RiderID=rider_id)
     except Rider.DoesNotExist:
         return notifications  # Return an empty list if the rider does not exist
 
     # Fetch new orders for this rider from the last 24 hours
-    new_orders = Delivery.objects.filter(RiderID=rider, DeliveryStatus='Pending', Date__gte=timezone.now() - timedelta(days=1))
+    new_orders = Delivery.objects.filter(
+        RiderID=rider, 
+        DeliveryStatus='Pending', 
+        Date__gte=timezone.now() - timedelta(days=1)
+    )
     
+    # Add notifications for new orders without timestamp
     for order in new_orders:
         notifications.append({
             'message': f'You have a new order from {order.CustomerID.CustomerName} at {order.RestaurantID.RestaurantName}.',
-            'timestamp': order.Date,
+        })
+    
+    # Add notifications for cancelled deliveries without timestamp
+    cancelled_orders = Delivery.objects.filter(
+        RiderID=rider, 
+        DeliveryStatus='Cancelled', 
+        Date__gte=timezone.now() - timedelta(days=1)
+    )
+    
+    for order in cancelled_orders:
+        notifications.append({
+            'message': f"Delivery ID # {order.DeliveryID} has been cancelled.",
         })
 
     return notifications
+
+
 
 @login_required
 def admin_notifications(request):
@@ -1864,27 +1966,33 @@ def admin_notifications(request):
     }
     return render(request, 'admin_notifications.html', context)
 
+
 @login_required
 def rider_notifications(request):
-    # Get the rider associated with the current user
-    rider = request.user.rider  # Ensure that the User model has a related Rider object
+    rider = request.user.rider
+    
+    # Retrieve notifications from the session or generate new ones if not available
+    notifications = request.session.get('notifications', get_rider_notifications(rider.RiderID))
 
-    # Fetch notifications for the rider using RiderID
-    rider_notifications = get_rider_notifications(rider.RiderID)  
-    notification_count = len(rider_notifications)
-
+    # Clear notifications if there is a POST request
     if request.method == 'POST':
-        request.session['rider_notifications'] = []  # Clear notifications
-        return redirect('rider_notifications')  # Redirect after clearing notifications
+        request.session['notifications'] = []  # Clear notifications from session
+        return redirect('rider_notifications')  # Redirect back to the same page
 
-    # Limit to the latest 10 notifications
-    latest_notifications = rider_notifications[-10:]
+    # Calculate notification count
+    notification_count = len(notifications)
 
+    # Prepare context for rendering the template
     context = {
-        'notifications': latest_notifications,
+        'notifications': notifications,
         'notification_count': notification_count,
+        'rider': rider,
     }
+
+    # Render the page with the context data
     return render(request, 'rider_notifications.html', context)
+
+
 
 @login_required
 def rider_profile_update(request):
@@ -1921,13 +2029,20 @@ def rider_profile_update(request):
 @login_required
 def rider_delivery_history(request):
     rider = request.user.rider
+    # Assuming get_rider_notifications fetches the notifications already
     rider_notifications = get_rider_notifications(rider.RiderID)
     notification_count = len(rider_notifications)
 
-    # Get the deliveries that are delivered and not archived
-    deliveries = Delivery.objects.filter(RiderID=rider, DeliveryStatus='Received', is_archived=False)
+    # Include 'Cancelled' deliveries in the history
+    deliveries = Delivery.objects.filter(
+        RiderID=rider, 
+        DeliveryStatus__in=['Received', 'Cancelled'], 
+        is_archived=False
+    )
 
-    latest_notifications = rider_notifications[-10:]
+    # If you already have rider_notifications, use that instead of querying Notification table
+    latest_notifications = rider_notifications[-10:]  # Get the latest 10 notifications
+    notification_count = len(latest_notifications)
 
     context = {
         'deliveries': deliveries,
@@ -1935,19 +2050,23 @@ def rider_delivery_history(request):
         'notification_count': notification_count,
         'rider': rider,
     }
-    
+
     return render(request, 'rider_delivery_history.html', context)
+
+
 
 @login_required
 def rider_archived_deliveries(request):
     rider = request.user.rider
+    # Get rider notifications using the custom function
     rider_notifications = get_rider_notifications(rider.RiderID)
     notification_count = len(rider_notifications)
 
     # Get the deliveries that are archived
     archived_deliveries = Delivery.objects.filter(RiderID=rider, is_archived=True)
 
-    latest_notifications = rider_notifications[-10:]
+    # Instead of using Notification, use the rider_notifications you retrieved
+    latest_notifications = rider_notifications[-10:]  # Get the latest 10 notifications
 
     context = {
         'archived_deliveries': archived_deliveries,
@@ -1957,6 +2076,7 @@ def rider_archived_deliveries(request):
     }
     
     return render(request, 'rider_archived_deliveries.html', context)
+
 
 @login_required
 def archive_delivery(request, delivery_id):
@@ -1969,14 +2089,17 @@ def archive_delivery(request, delivery_id):
 
 @login_required
 def rider_transactions(request):
-    rider_notifications = request.session.get('rider_notifications', [])
+    rider = Rider.objects.get(user=request.user)
+    rider_notifications = get_rider_notifications(rider.RiderID)
     notification_count = len(rider_notifications)
 
     # Get the logged-in rider
     rider = request.user.rider
 
-    # Get all delivery records assigned to this rider excluding 'Received' status
-    deliveries = Delivery.objects.filter(RiderID=rider).exclude(DeliveryStatus='Received').select_related('RestaurantID').prefetch_related('delivery_items__FoodID')
+    # Get all delivery records assigned to this rider excluding 'Received' and 'Cancelled' statuses
+    deliveries = Delivery.objects.filter(RiderID=rider).exclude(
+        DeliveryStatus__in=['Received', 'Cancelled']
+    ).select_related('RestaurantID').prefetch_related('delivery_items__FoodID')
 
     # Log deliveries and items to check if they contain the expected data
     for delivery in deliveries:
@@ -1988,9 +2111,11 @@ def rider_transactions(request):
         'deliveries': deliveries,
         'notification_count': notification_count,
         'rider': rider,
+        'rider_notifications': rider_notifications,
     }
 
     return render(request, "rider_transactions.html", context)
+
 
 
 
@@ -2282,4 +2407,3 @@ def delete_conversation(request):
             return JsonResponse({'success': False, 'error': 'Rider not found'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
-

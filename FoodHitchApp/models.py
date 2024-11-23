@@ -98,6 +98,7 @@ class Restaurant(models.Model):
                     location = data['results'][0]['geometry']['location']
                     self.Latitude = location['lat']
                     self.Longitude = location['lng']
+
 class Menu(models.Model):
     FoodID = models.BigAutoField(primary_key=True)
     restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE)
@@ -134,6 +135,8 @@ class Delivery(models.Model):
         ('On Transit', 'On Transit'),
         ('Delivered', 'Delivered'),
         ('Received', 'Received'),
+        ('Cancelled', 'Cancelled'),  # Add Canceled status
+
     ]
 
     DeliveryID = models.BigAutoField(primary_key=True)

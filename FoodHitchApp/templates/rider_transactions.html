@@ -14,7 +14,7 @@
     <div class="transaction-container">       
         {% if deliveries %}
             {% for delivery in deliveries %}
-            <div class="transaction-card">
+            <div class="transaction-card" data-delivery-id="{{ delivery.DeliveryID }}">
                 <div class="transaction-info">
                     <p><strong>Transaction ID:</strong> {{ delivery.OrderID.TransactionID }}</p>
                     <p><strong>Delivery ID:</strong> {{ delivery.DeliveryID }}</p>
@@ -35,7 +35,6 @@
                     <p><strong>Payment Method:</strong> {{ delivery.OrderID.PaymentMethod }}</p>
                     <p><strong>Payment Status:</strong> {{ delivery.OrderID.PaymentStatus }}</p> <!-- Display Payment Status -->
 
-                    
                     <p class="status"><strong>Delivery Status:</strong> 
                         <span class="status-indicator" data-delivery-id="{{ delivery.DeliveryID }}" 
                         {% if delivery.DeliveryStatus == 'In Transit' %} class="status-indicator status-in-transit" 
@@ -43,17 +42,22 @@
                         {% else %} class="status-indicator status-pending" {% endif %}>
                         {{ delivery.DeliveryStatus }}
                     </span>
-                    </p>
+                    
                 </div>
+                {% if delivery.OrderID.PaymentStatus == 'Pending' %}
+                <p class="payment-status-message" style="color: red; font-style: italic;">The proof of payment is being reviewed by the admin. Please stand by.</p>
+            {% elif delivery.OrderID.PaymentStatus == 'Approved' %}
                 <button class="track-button" style="margin-bottom: 30px;" onclick="trackCustomer('{{ delivery.Address }}')">Track Customer Location</button>
-                
                 <form class="status-update-form" data-delivery-id="{{ delivery.DeliveryID }}">
                     {% csrf_token %}
                     <button type="button" name="status" value="In Transit" class="status-button in-transit" onclick="updateStatus('{{ delivery.DeliveryID }}', 'On Transit')">Mark as In Transit</button>
                     <button type="button" name="status" value="Delivered" class="status-button delivered" onclick="updateStatus('{{ delivery.DeliveryID }}', 'Delivered')">Mark as Delivered</button>
                 </form>
+            {% endif %}
             </div>
             {% endfor %}
+
+
         {% else %}
             <p>No deliveries assigned to you.</p>
         {% endif %}
@@ -71,6 +75,7 @@
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAahMs9GBd2ChJopz74dhOjL8a0ZxXo9-k&callback=initializeMap" async defer></script>
 <script>
+
     var map;
     var directionsService;
     var directionsRenderer;
@@ -298,6 +303,8 @@
     background-color: #007e11;
 }
 
+
+
 .track-button {
     background-color: #333;
 }
@@ -355,5 +362,27 @@
     .transaction-info .status-indicator.status-pending {
         color: #dc3545;
     }
+    
+
+
+
+    .history {
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 12px;
+        cursor: pointer;
+        margin-top: 15px;
+        font-weight: bold;
+        transition: background-color 0.3s;
+        width: 100%;
+        font-size: 16px;
+        background-color: #009914;
+    }
+
+.history:hover {
+    color: #009914;
+    background-color: #f4f3f3;
+}
 </style>
 {% endblock %}

@@ -29,8 +29,20 @@
                 <p><strong>Payment Method:</strong> {{ delivery.OrderID.PaymentMethod }}</p>
                 <p><strong>Payment Status:</strong> {{ delivery.OrderID.PaymentStatus }}</p> <!-- Display Payment Status -->
             </div>
+            {% if delivery.OrderID.PaymentStatus == 'Pending' %}
+            <p class="payment-pending-message" style="color: red; font-style: italic;">
+                Your proof of payment is under review by the admin. Kindly wait a moment while it is being processed.
+            </p>
+                {% elif delivery.OrderID.PaymentStatus == 'Disapproved' %}
+            <p class="payment-disapproved-message" style="color: red; font-style: italic;">
+                We apologize, but your proof of payment has been disapproved.
+            </p>
+                {% else %}
             <button class="track-button" onclick="trackRider('{{ delivery.RiderID.RiderID }}')">Track Rider Location</button>
             <button class="chat-button" onclick="openChat('{{ delivery.RiderID.RiderID }}')">Chat with Rider</button>
+            {% endif %}
+
+
             {% if delivery.DeliveryStatus == 'Delivered' %}
                 <button class="update-status-button" onclick="updateDeliveryStatus('{{ delivery.DeliveryID }}')">Received</button>
             {% endif %}
@@ -48,6 +60,9 @@
 
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAahMs9GBd2ChJopz74dhOjL8a0ZxXo9-k&callback=initializeMap"></script>
 <script>
+
+
+
     var map;
     var riderMarker;
 
@@ -291,6 +306,24 @@
         text-decoration: none;
         cursor: pointer;
     }
+    .history {
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 12px;
+        cursor: pointer;
+        margin-top: 15px;
+        font-weight: bold;
+        transition: background-color 0.3s;
+        width: 100%;
+        font-size: 16px;
+        background-color: #009914;
+    }
+
+.history:hover {
+    color: #009914;
+    background-color: #f4f3f3;
+}
 </style>
 
 {% endblock %}

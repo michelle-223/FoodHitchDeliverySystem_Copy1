@@ -23,7 +23,15 @@
                     <p><strong>Date:</strong> {{ delivery.Date|date:"F j, Y" }}</p> <!-- Added Date here -->
                     <p><strong>Restaurant Name:</strong> {{ delivery.RestaurantID.RestaurantName }}</p>
                     <p><strong>Total Payable:</strong> ₱{{ delivery.TotalPayableAmount }}</p>
-                    <p class="status"><strong>Status:</strong> <span class="status-received">Received</span></p>
+                    <p><strong>Delivery Status:</strong>
+                        {% if delivery.DeliveryStatus %}
+                            {{ delivery.DeliveryStatus }}  <!-- Display the actual value of DeliveryStatus -->
+                        {% else %}
+                            Status not available
+                        {% endif %}
+                    </p>
+                    
+                    
                 </div>
                 <button class="archive-button" onclick="archiveDelivery('{{ delivery.DeliveryID }}')">Archive</button>
             </div>
@@ -91,6 +99,13 @@
         font-weight: bold;
     }
 
+    .status-cancelled {
+        color: #dc3545; /* Red color for canceled */
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-weight: bold;
+    }
+
     .archive-button {
         background-color: #17a2b8; /* Teal */
         color: white;
@@ -115,7 +130,7 @@
         font-size: 18px;
         color: #777;
     }
-    
+
     .custom-confirm-button {
         background-color: #009914 !important;
         color: white !important;
