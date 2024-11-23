@@ -1636,8 +1636,8 @@ def approve_payment_proof(request, order_id):
         # Handle the case where the order doesn't exist or is not in Pending status
         return redirect('admin_pending_proofs')
 
-from django.contrib import messages  # Import Django messages framework
-from django.shortcuts import redirect
+from django.core.mail import send_mail
+from django.conf import settings
 
 @login_required
 def disapprove_payment_proof(request, order_id):
@@ -1647,14 +1647,38 @@ def disapprove_payment_proof(request, order_id):
         order.PaymentStatus = 'Disapproved'
         order.save()
 
+        # Fetch the associated customer for the email
+        customer = order.CustomerID  # Assuming there is a relation to the Customer model
+
+        # Send an email to the customer
+        send_mail(
+            'Payment Proof Disapproved - Order Cancelled',
+            'We apologize but your proof of payment is disapproved, so your order has been cancelled.',
+            settings.DEFAULT_FROM_EMAIL,  # Default email from your settings
+            [customer.Email],  # The customer's email
+            fail_silently=False,
+        )
+
         # Update the related delivery status to 'Cancelled'
         try:
             delivery = Delivery.objects.get(OrderID=order)
             delivery.DeliveryStatus = 'Cancelled'
             delivery.save()
 
-            # Create a message for the rider (or user in this case)
-            rider = delivery.RiderID  # Assuming the rider is related to the delivery
+            # Fetch the assigned rider for the delivery
+            rider = delivery.RiderID  # Assuming the RiderID field holds the rider's information
+            
+            # Send an email to the rider
+            if rider and rider.Email:
+                send_mail(
+                    'Delivery Order Cancelled',
+                    f'The delivery order number {order.OrderID} has been cancelled due to payment disapproval.',
+                    settings.DEFAULT_FROM_EMAIL,  # Default email from your settings
+                    [rider.Email],  # The rider's email
+                    fail_silently=False,
+                )
+
+            # Optionally, create a message for the rider (for in-app notifications)
             messages.info(request, f"Your delivery for OrderID {order.OrderID} has been cancelled due to payment disapproval.")
 
         except Delivery.DoesNotExist:
@@ -1663,9 +1687,12 @@ def disapprove_payment_proof(request, order_id):
 
         # Redirect back to the list of pending proofs
         return redirect('admin_pending_proofs')
+    
     except Order.DoesNotExist:
         # Handle the case where the order doesn't exist or is not in Pending status
         return redirect('admin_pending_proofs')
+
+
 
 
 
